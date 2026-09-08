@@ -234,6 +234,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   style={{ accentColor: 'var(--accent)' }}
                 />
               </div>
+
+              {/* Optional client API key for static GitHub Pages */}
+              <div
+                className="p-3.5 rounded-lg border space-y-2"
+                style={{
+                  backgroundColor: 'var(--bg-base)',
+                  borderColor: 'var(--border-subtle)',
+                }}
+              >
+                <div>
+                  <div className="font-bold text-xs flex items-center justify-between" style={{ color: 'var(--text-primary)' }}>
+                    <span>Static / GitHub Pages API Key</span>
+                    <span className="text-[10px] font-mono opacity-60">Optional</span>
+                  </div>
+                  <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    On Cloud Run or full-stack dev, the secure backend server handles all requests automatically. If you deploy statically to GitHub Pages, you can supply your free Gemini key here so ERROREN responds directly in the browser.
+                  </div>
+                </div>
+                <input
+                  type="password"
+                  value={localSettings.clientApiKey || ''}
+                  onChange={e => setLocalSettings({ ...localSettings, clientApiKey: e.target.value.trim() })}
+                  placeholder="AIzaSy... (Only needed if hosting purely on GitHub Pages)"
+                  className="w-full p-2.5 rounded-md border text-xs font-mono outline-none transition-colors"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    borderColor: 'var(--border-base)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+              </div>
             </div>
           )}
 

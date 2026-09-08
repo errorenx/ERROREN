@@ -10,6 +10,8 @@ import {
   ArrowRight,
   User,
   Palette,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { Conversation, MessageAttachment, UserProfile } from '../types';
 import { MessageItem } from './MessageItem';
@@ -31,6 +33,7 @@ interface ChatAreaProps {
   currentProfile: UserProfile | null;
   onOpenAccount: () => void;
   currentThemeId: ThemeId;
+  onSelectTheme?: (themeId: ThemeId) => void;
 }
 
 const STARTER_PROMPTS = [
@@ -75,9 +78,19 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   currentProfile,
   onOpenAccount,
   currentThemeId,
+  onSelectTheme,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeTheme = THEMES[currentThemeId];
+
+  const handleToggleMode = () => {
+    if (!onSelectTheme) return;
+    if (activeTheme.mode === 'dark') {
+      onSelectTheme('clean-white');
+    } else {
+      onSelectTheme('midnight-blue');
+    }
+  };
 
   const scrollToBottom = (smooth = true) => {
     messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
@@ -184,16 +197,41 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </span>
           </button>
 
-          {/* Quick Theme Switcher Trigger */}
+          {/* Direct Dark / Light Mode Toggle */}
+          <button
+            onClick={handleToggleMode}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[11px] font-semibold uppercase tracking-wider transition-all cursor-pointer opacity-90 hover:opacity-100 shadow-2xs"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              borderColor: 'var(--border-subtle)',
+              color: 'var(--accent)',
+            }}
+            title={`Switch to ${activeTheme.mode === 'dark' ? 'Light' : 'Dark'} Mode`}
+            aria-label="Toggle Dark/Light Mode"
+          >
+            {activeTheme.mode === 'dark' ? (
+              <>
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden md:inline">Light</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-3.5 h-3.5 text-indigo-500" />
+                <span className="hidden md:inline">Dark</span>
+              </>
+            )}
+          </button>
+
+          {/* Theme Palette Modal Trigger */}
           <button
             onClick={onOpenSettings}
             className="p-1.5 rounded-md border transition-all cursor-pointer opacity-80 hover:opacity-100"
             style={{
               backgroundColor: 'var(--bg-card)',
               borderColor: 'var(--border-subtle)',
-              color: 'var(--accent)',
+              color: 'var(--text-secondary)',
             }}
-            title={`Active Theme: ${activeTheme.name}`}
+            title={`10 Themes (${activeTheme.name})`}
             aria-label="Change Theme"
           >
             <Palette className="w-4 h-4" />

@@ -42,22 +42,21 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 // Candidate models in order of priority & reliability.
-// gemini-3.8-flash is the primary model for text tasks;
-// gemini-3.1-flash-lite offers high-throughput low-latency fallback;
-// gemini-flash-latest and gemini-3.6-flash provide backup resilience.
+// gemini-3.1-flash-lite offers high throughput, lowest latency (~2s), and avoids high-demand queues.
+// gemini-3.5-flash and gemini-3.6-flash serve as secondary resilience layers.
 const CANDIDATE_MODELS = [
-  'gemini-3.8-flash',
   'gemini-3.1-flash-lite',
-  'gemini-flash-latest',
+  'gemini-3.5-flash',
   'gemini-3.6-flash',
 ];
 
 const DEFAULT_SYSTEM_INSTRUCTION =
-  'You are ERROREN, a brilliant, helpful, friendly, and highly intelligent AI assistant. ' +
-  'You have deep expertise in programming, software engineering, science, philosophy, writing, languages, and general knowledge. ' +
-  'You understand and can converse naturally in English, Roman Urdu (e.g., "aap kaisay hain", "mein theek hoon"), formal Urdu (اردو), and other languages based on what the user speaks. ' +
-  'Always format code blocks with language identifiers and clean markdown. Provide clear, accurate, and concise explanations with code examples when relevant. ' +
-  'Be encouraging and polite.';
+  'You are ERROREN AI, a brilliant, super-helpful, friendly, and lightning-fast AI companion. ' +
+  'You provide accurate, articulate, and well-structured answers for any question, whether it involves programming, debugging, math, science, creative writing, business, or everyday conversation. ' +
+  'You naturally match the user’s language: if the user writes in Roman Urdu (e.g. "aap kaise hain", "mujhe code samjha dein", "kya chal raha hai"), reply warmly and respectfully in natural Roman Urdu. ' +
+  'If the user writes in English, reply in English. If in Urdu (اردو), reply in Urdu. ' +
+  'Format all responses cleanly with Markdown, including bullet points, numbered lists, and syntax-highlighted code blocks with proper language identifiers. ' +
+  'Keep your responses friendly, encouraging, and complete with no unnecessary robotic filler.';
 
 function formatContents(messages: any[], image: any) {
   const contents: Array<{ role: 'user' | 'model'; parts: Array<any> }> = [];
@@ -79,8 +78,8 @@ function formatContents(messages: any[], image: any) {
       });
     }
 
-    if (msg.text) {
-      parts.push({ text: msg.text });
+    if (msg.text && typeof msg.text === 'string' && msg.text.trim()) {
+      parts.push({ text: msg.text.trim() });
     }
 
     if (parts.length > 0) {
@@ -88,7 +87,30 @@ function formatContents(messages: any[], image: any) {
     }
   }
 
-  return contents;
+  // Ensure conversation starts with 'user' turn (Gemini API requirement)
+  while (contents.length > 0 && contents[0].role !== 'user') {
+    contents.shift();
+  }
+
+  if (contents.length === 0) {
+    contents.push({
+      role: 'user',
+      parts: [{ text: 'Hello ERROREN' }],
+    });
+  }
+
+  // Merge consecutive turns with identical roles to prevent multi-turn errors
+  const merged: Array<{ role: 'user' | 'model'; parts: Array<any> }> = [];
+  for (const item of contents) {
+    const prev = merged[merged.length - 1];
+    if (prev && prev.role === item.role) {
+      prev.parts.push(...item.parts);
+    } else {
+      merged.push({ role: item.role, parts: [...item.parts] });
+    }
+  }
+
+  return merged;
 }
 
 // Streaming Chat API with automated model fallback on 503 / high demand errors
@@ -117,8 +139,10 @@ app.post('/api/chat/stream', async (req: Request, res: Response): Promise<void> 
   let lastError: any = null;
   let clientDisconnected = false;
 
-  req.on('close', () => {
-    clientDisconnected = true;
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      clientDisconnected = true;
+    }
   });
 
   try {
@@ -161,8 +185,27 @@ app.post('/api/chat/stream', async (req: Request, res: Response): Promise<void> 
         }
 
         // Delay briefly before fallback attempt to relieve transient concurrency
-        await new Promise(resolve => setTimeout(resolve, 300));
-        console.log(`[ERROREN] Attempting fallback model...`);
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+
+    // If streaming had issues but nothing was sent yet, attempt non-streaming fallback
+    if (!streamSucceeded && !clientDisconnected) {
+      console.log('[ERROREN] Attempting non-streaming fallback with gemini-3.1-flash-lite...');
+      try {
+        const directRes = await ai.models.generateContent({
+          model: 'gemini-3.1-flash-lite',
+          contents: contents as any,
+          config,
+        });
+        if (directRes.text) {
+          res.write(`data: ${JSON.stringify({ chunk: directRes.text })}\n\n`);
+          (res as any).flush?.();
+          streamSucceeded = true;
+        }
+      } catch (fallbackErr: any) {
+        console.warn('[ERROREN] Direct fallback also encountered error:', fallbackErr?.message || fallbackErr);
+        lastError = fallbackErr || lastError;
       }
     }
 
@@ -175,7 +218,7 @@ app.post('/api/chat/stream', async (req: Request, res: Response): Promise<void> 
     // If all models failed
     console.error('All model attempts failed in /api/chat/stream:', lastError);
     let userMessage =
-      'The AI service is momentarily experiencing high demand. Please try again in a few moments.';
+      'Main is waqt thoda busy hoon ya connection issue hai. Baraye meherbani thori dair baad dobara koshish karein.';
     if (lastError?.message && typeof lastError.message === 'string') {
       try {
         const parsed = JSON.parse(lastError.message);

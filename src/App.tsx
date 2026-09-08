@@ -295,8 +295,46 @@ export default function App() {
       if (!response.ok) {
         // Check if server is running or if static environment (e.g. GitHub Pages)
         if (response.status === 404) {
+          if (settings.clientApiKey) {
+            // Direct client call for static GitHub Pages deployment with user-provided Gemini API key
+            try {
+              const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${settings.clientApiKey}`;
+              const clientPayload = {
+                contents: historyForApi.map(m => ({
+                  role: m.role === 'user' ? 'user' : 'model',
+                  parts: [{ text: m.text || '' }],
+                })),
+                systemInstruction: settings.systemPrompt ? { parts: [{ text: settings.systemPrompt }] } : undefined,
+              };
+              const directRes = await fetch(directUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(clientPayload),
+                signal: abortController.signal,
+              });
+              if (directRes.ok) {
+                const data = await directRes.json();
+                const directText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated.';
+                setConversations(prev =>
+                  prev.map(conv => {
+                    if (conv.id !== conversationId) return conv;
+                    return {
+                      ...conv,
+                      messages: conv.messages.map(m =>
+                        m.id === assistantMsgId ? { ...m, content: directText, isStreaming: false } : m
+                      ),
+                    };
+                  })
+                );
+                return;
+              }
+            } catch (directErr: any) {
+              console.warn('Client-side direct Gemini fetch error:', directErr);
+            }
+          }
+
           throw new Error(
-            'API server endpoint not found. If running on static GitHub Pages, connect an API key in Settings or run with backend server.'
+            'ERROREN is deployed on static GitHub Pages. To chat here without a backend server, please enter your free Gemini API Key in Settings (⚙️ top right > AI Persona & API tab).'
           );
         }
         throw new Error(`Server returned error: ${response.status} ${response.statusText}`);
@@ -609,6 +647,7 @@ export default function App() {
           currentProfile={localProfile}
           onOpenAccount={() => setIsAccountOpen(true)}
           currentThemeId={settings.themeId}
+          onSelectTheme={handleSelectTheme}
         />
       </main>
 

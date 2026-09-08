@@ -32,6 +32,7 @@ export interface AppSettings {
   themeMode: ThemeMode;
   systemPrompt: string;
   streamResponses: boolean;
+  clientApiKey?: string;
 }
 
 export interface UserProfile {
