@@ -1,33 +1,100 @@
 @import "tailwindcss";
 
 @layer base {
+  :root {
+    --bg-base: #070d1a;
+    --bg-surface: #0d172e;
+    --bg-card: #122040;
+    --bg-card-hover: #182b54;
+    --bg-active: #1e3568;
+    --border-base: #1e325c;
+    --border-subtle: #142342;
+    --border-focus: #00d2ff;
+    --text-primary: #f0f6fc;
+    --text-secondary: #9bb0d1;
+    --text-muted: #5b7298;
+    --accent: #00d2ff;
+    --accent-hover: #38bdf8;
+    --accent-subtle: rgba(0, 210, 255, 0.12);
+    --accent-text: #021020;
+    --code-bg: #0a1324;
+    --scrollbar-thumb: #1e325c;
+  }
+
   body {
-    background-color: #050505;
-    color: #e0e0e0;
+    background-color: var(--bg-base);
+    color: var(--text-primary);
     font-family: 'Space Grotesk', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
   }
 
   ::selection {
-    background-color: #00FF66;
-    color: #000000;
+    background-color: var(--accent);
+    color: var(--accent-text);
   }
 }
 
-/* Custom minimal dark scrollbars */
+/* Dynamic theme custom scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #080808;
+  background: var(--bg-base);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1f1f1f;
-  border-radius: 1px;
+  background: var(--border-base);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #00FF66;
+  background: var(--accent);
+}
+
+/* Helpful theme utility tokens */
+.theme-bg-base {
+  background-color: var(--bg-base);
+}
+.theme-bg-surface {
+  background-color: var(--bg-surface);
+}
+.theme-bg-card {
+  background-color: var(--bg-card);
+}
+.theme-bg-card-hover:hover {
+  background-color: var(--bg-card-hover);
+}
+.theme-bg-active {
+  background-color: var(--bg-active);
+}
+.theme-border {
+  border-color: var(--border-base);
+}
+.theme-border-subtle {
+  border-color: var(--border-subtle);
+}
+.theme-border-focus:focus {
+  border-color: var(--border-focus);
+}
+.theme-text-primary {
+  color: var(--text-primary);
+}
+.theme-text-secondary {
+  color: var(--text-secondary);
+}
+.theme-text-muted {
+  color: var(--text-muted);
+}
+.theme-accent {
+  color: var(--accent);
+}
+.theme-accent-bg {
+  background-color: var(--accent);
+  color: var(--accent-text);
+}
+.theme-accent-subtle {
+  background-color: var(--accent-subtle);
+  color: var(--accent);
 }

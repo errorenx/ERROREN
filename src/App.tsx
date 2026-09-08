@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import {
   loadConversations,
   saveConversations,
@@ -12,11 +13,22 @@ import {
   loadSettings,
   saveSettings,
   generateChatTitle,
+  loadLocalProfile,
+  saveLocalProfile,
 } from './utils/storage';
-import { Conversation, ChatMessage, MessageAttachment, AppSettings } from './types';
+import { Conversation, ChatMessage, MessageAttachment, AppSettings, UserProfile } from './types';
 import { Sidebar } from './components/Sidebar';
 import { ChatArea } from './components/ChatArea';
 import { SettingsModal } from './components/SettingsModal';
+import { AccountModal } from './components/AccountModal';
+import {
+  auth,
+  logOut,
+  saveConversationToCloud,
+  deleteConversationFromCloud,
+  loadCloudConversations,
+} from './lib/firebase';
+import { applyTheme, saveThemeId, ThemeId, THEMES, DEFAULT_THEME_ID } from './utils/theme';
 
 export default function App() {
   const [conversations, setConversations] = useState<Conversation[]>(() => loadConversations());
@@ -25,8 +37,84 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isAccountOpen, setIsAccountOpen] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [localProfile, setLocalProfile] = useState<UserProfile | null>(() => loadLocalProfile());
 
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Initialize theme on mount and whenever themeId changes
+  useEffect(() => {
+    const currentTheme = settings.themeId || DEFAULT_THEME_ID;
+    applyTheme(currentTheme);
+    saveThemeId(currentTheme);
+  }, [settings.themeId]);
+
+  // Sync settings
+  useEffect(() => {
+    saveSettings(settings);
+  }, [settings]);
+
+  // Listen to Firebase Auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async user => {
+      setCurrentUser(user);
+      if (user) {
+        // If logged in via Google and no local profile name, populate local profile
+        if (!localProfile) {
+          const profile: UserProfile = {
+            id: user.uid,
+            name: user.displayName || 'Google User',
+            email: user.email || '',
+            avatar: user.photoURL || undefined,
+            savedAt: Date.now(),
+          };
+          setLocalProfile(profile);
+          saveLocalProfile(profile);
+        }
+
+        try {
+          const cloudChats = await loadCloudConversations(user.uid);
+          if (cloudChats.length > 0) {
+            setConversations(prevLocal => {
+              const cloudIds = new Set(cloudChats.map(c => c.id));
+              const localOnly = prevLocal.filter(c => !cloudIds.has(c.id) && c.messages.length > 0);
+
+              localOnly.forEach(localChat => {
+                saveConversationToCloud(user.uid, localChat).catch(err =>
+                  console.warn('Backup local chat to cloud error:', err)
+                );
+              });
+
+              const merged = [...cloudChats, ...localOnly].sort(
+                (a, b) => b.updatedAt - a.updatedAt
+              );
+              return merged;
+            });
+
+            if (!cloudChats.some(c => c.id === activeId) && cloudChats[0]) {
+              setActiveId(cloudChats[0].id);
+            }
+          } else {
+            setConversations(prevLocal => {
+              prevLocal.forEach(c => {
+                if (c.messages.length > 0) {
+                  saveConversationToCloud(user.uid, c).catch(err =>
+                    console.warn('Initial cloud sync error:', err)
+                  );
+                }
+              });
+              return prevLocal;
+            });
+          }
+        } catch (err) {
+          console.error('Failed to sync cloud conversations:', err);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Sync active chat ID & conversations with localStorage
   useEffect(() => {
@@ -36,16 +124,6 @@ export default function App() {
   useEffect(() => {
     saveActiveChatId(activeId);
   }, [activeId]);
-
-  useEffect(() => {
-    saveSettings(settings);
-    // Theme class management on HTML element
-    if (settings.theme === 'light') {
-      document.documentElement.classList.remove('dark');
-    } else {
-      document.documentElement.classList.add('dark');
-    }
-  }, [settings]);
 
   // Global Keyboard Shortcuts (Ctrl/Cmd + K for new chat)
   useEffect(() => {
@@ -68,8 +146,32 @@ export default function App() {
       messages: [],
     };
 
+  const handleSelectTheme = (themeId: ThemeId) => {
+    const mode = THEMES[themeId]?.mode || 'dark';
+    const updated: AppSettings = {
+      ...settings,
+      themeId,
+      themeMode: mode,
+    };
+    setSettings(updated);
+    applyTheme(themeId);
+    saveThemeId(themeId);
+  };
+
+  const handleSaveProfile = (profile: UserProfile) => {
+    setLocalProfile(profile);
+    saveLocalProfile(profile);
+  };
+
+  const handleLogoutProfile = async () => {
+    setLocalProfile(null);
+    saveLocalProfile(null);
+    if (currentUser) {
+      await logOut().catch(console.error);
+    }
+  };
+
   const handleNewChat = () => {
-    // If current conversation is already empty, just keep it
     if (activeConversation.messages.length === 0) {
       return;
     }
@@ -84,6 +186,10 @@ export default function App() {
 
     setConversations(prev => [newChat, ...prev]);
     setActiveId(newChat.id);
+
+    if (currentUser) {
+      saveConversationToCloud(currentUser.uid, newChat).catch(console.error);
+    }
   };
 
   const handleDeleteConversation = (id: string) => {
@@ -105,11 +211,15 @@ export default function App() {
       }
       return remaining;
     });
+
+    if (currentUser) {
+      deleteConversationFromCloud(currentUser.uid, id).catch(console.error);
+    }
   };
 
-  const handleRenameConversation = (id: string, newTitle: string) => {
+  const handleTogglePin = (id: string) => {
     setConversations(prev =>
-      prev.map(c => (c.id === id ? { ...c, title: newTitle, updatedAt: Date.now() } : c))
+      prev.map(c => (c.id === id ? { ...c, pinned: !c.pinned } : c))
     );
   };
 
@@ -121,6 +231,11 @@ export default function App() {
       updatedAt: Date.now(),
       messages: [],
     };
+    if (currentUser) {
+      conversations.forEach(c => {
+        deleteConversationFromCloud(currentUser.uid, c.id).catch(console.error);
+      });
+    }
     setConversations([fresh]);
     setActiveId(fresh.id);
   };
@@ -178,6 +293,12 @@ export default function App() {
       });
 
       if (!response.ok) {
+        // Check if server is running or if static environment (e.g. GitHub Pages)
+        if (response.status === 404) {
+          throw new Error(
+            'API server endpoint not found. If running on static GitHub Pages, connect an API key in Settings or run with backend server.'
+          );
+        }
         throw new Error(`Server returned error: ${response.status} ${response.statusText}`);
       }
 
@@ -235,12 +356,13 @@ export default function App() {
         }
       }
 
-      // Mark streaming done
-      setConversations(prev =>
-        prev.map(conv => {
+      // Mark streaming done and backup to Firestore if user logged in
+      setConversations(prev => {
+        const updated = prev.map(conv => {
           if (conv.id !== conversationId) return conv;
-          return {
+          const updatedConv = {
             ...conv,
+            updatedAt: Date.now(),
             messages: conv.messages.map(m =>
               m.id === assistantMsgId
                 ? {
@@ -251,28 +373,41 @@ export default function App() {
                 : m
             ),
           };
-        })
-      );
+
+          if (currentUser) {
+            saveConversationToCloud(currentUser.uid, updatedConv).catch(err =>
+              console.warn('Failed to auto-save to Firestore:', err)
+            );
+          }
+
+          return updatedConv;
+        });
+        return updated;
+      });
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        // User deliberately stopped generation
-        setConversations(prev =>
-          prev.map(conv => {
+        setConversations(prev => {
+          const updated = prev.map(conv => {
             if (conv.id !== conversationId) return conv;
-            return {
+            const updatedConv = {
               ...conv,
               messages: conv.messages.map(m =>
                 m.id === assistantMsgId ? { ...m, isStreaming: false } : m
               ),
             };
-          })
-        );
+            if (currentUser) {
+              saveConversationToCloud(currentUser.uid, updatedConv).catch(console.error);
+            }
+            return updatedConv;
+          });
+          return updated;
+        });
       } else {
         console.error('Error during streaming chat:', err);
-        setConversations(prev =>
-          prev.map(conv => {
+        setConversations(prev => {
+          const updated = prev.map(conv => {
             if (conv.id !== conversationId) return conv;
-            return {
+            const updatedConv = {
               ...conv,
               messages: conv.messages.map(m =>
                 m.id === assistantMsgId
@@ -280,15 +415,20 @@ export default function App() {
                       ...m,
                       content:
                         m.content ||
-                        'Sorry, I encountered an issue generating a response. Please check your connection or try again.',
+                        `An error occurred while generating a response: ${err.message || 'Please check your connection and try again.'}`,
                       isStreaming: false,
                       error: true,
                     }
                   : m
               ),
             };
-          })
-        );
+            if (currentUser) {
+              saveConversationToCloud(currentUser.uid, updatedConv).catch(console.error);
+            }
+            return updatedConv;
+          });
+          return updated;
+        });
       }
     } finally {
       setIsGenerating(false);
@@ -309,31 +449,29 @@ export default function App() {
       attachment,
     };
 
-    // Auto-update title if it's currently generic
     const shouldUpdateTitle =
       currentConv.messages.length === 0 ||
       currentConv.title === 'New chat' ||
       currentConv.title === 'Welcome to ERROREN';
 
     const newTitle = shouldUpdateTitle ? generateChatTitle(text || 'Image Analysis') : currentConv.title;
-
-    // Update conversation with user message
     const updatedMessages = [...currentConv.messages, userMessage];
 
+    const updatedConv: Conversation = {
+      ...currentConv,
+      title: newTitle,
+      updatedAt: Date.now(),
+      messages: updatedMessages,
+    };
+
     setConversations(prev =>
-      prev.map(c =>
-        c.id === currentConv.id
-          ? {
-              ...c,
-              title: newTitle,
-              updatedAt: Date.now(),
-              messages: updatedMessages,
-            }
-          : c
-      )
+      prev.map(c => (c.id === currentConv.id ? updatedConv : c))
     );
 
-    // Prepare history payload for API
+    if (currentUser) {
+      saveConversationToCloud(currentUser.uid, updatedConv).catch(console.error);
+    }
+
     const historyForApi = updatedMessages.map(m => ({
       role: (m.role === 'user' ? 'user' : 'model') as 'user' | 'model',
       text: m.content,
@@ -345,7 +483,6 @@ export default function App() {
   const handleRegenerate = async () => {
     if (isGenerating || activeConversation.messages.length === 0) return;
 
-    // Remove last assistant message
     const messages = [...activeConversation.messages];
     if (messages[messages.length - 1].role === 'assistant') {
       messages.pop();
@@ -372,7 +509,6 @@ export default function App() {
     const msgIndex = activeConversation.messages.findIndex(m => m.id === messageId);
     if (msgIndex === -1) return;
 
-    // Slice messages up to the edited user message
     const sliced = activeConversation.messages.slice(0, msgIndex);
     const targetMsg = activeConversation.messages[msgIndex];
 
@@ -384,9 +520,19 @@ export default function App() {
 
     const newMessages = [...sliced, editedUserMsg];
 
+    const updatedConv: Conversation = {
+      ...activeConversation,
+      messages: newMessages,
+      updatedAt: Date.now(),
+    };
+
     setConversations(prev =>
-      prev.map(c => (c.id === activeConversation.id ? { ...c, messages: newMessages } : c))
+      prev.map(c => (c.id === activeConversation.id ? updatedConv : c))
     );
+
+    if (currentUser) {
+      saveConversationToCloud(currentUser.uid, updatedConv).catch(console.error);
+    }
 
     const historyForApi = newMessages.map(m => ({
       role: (m.role === 'user' ? 'user' : 'model') as 'user' | 'model',
@@ -400,7 +546,7 @@ export default function App() {
     setConversations(prev =>
       prev.map(conv => {
         if (conv.id !== activeConversation.id) return conv;
-        return {
+        const updatedConv = {
           ...conv,
           messages: conv.messages.map(m => {
             if (m.id !== messageId) return m;
@@ -410,38 +556,40 @@ export default function App() {
             };
           }),
         };
+
+        if (currentUser) {
+          saveConversationToCloud(currentUser.uid, updatedConv).catch(console.error);
+        }
+
+        return updatedConv;
       })
     );
   };
 
-  const handleToggleTheme = () => {
-    setSettings(prev => ({
-      ...prev,
-      theme: prev.theme === 'dark' ? 'light' : 'dark',
-    }));
-  };
-
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#050505] text-[#e0e0e0] font-sans antialiased relative selection:bg-[#00FF66] selection:text-black">
-      {/* Ambient Flux Glow */}
-      <div
-        className="absolute top-0 right-0 w-48 h-full pointer-events-none z-0"
-        style={{ background: 'linear-gradient(to left, rgba(0, 255, 102, 0.03), transparent)' }}
-      />
-
+    <div
+      className="flex h-screen w-screen overflow-hidden font-sans antialiased relative transition-colors"
+      style={{
+        backgroundColor: 'var(--bg-base)',
+        color: 'var(--text-primary)',
+      }}
+    >
       {/* Sidebar */}
       <Sidebar
         conversations={conversations}
         activeId={activeId}
         onSelectConversation={id => setActiveId(id)}
-        onNewChat={handleNewChat}
+        onNewConversation={handleNewChat}
         onDeleteConversation={handleDeleteConversation}
-        onRenameConversation={handleRenameConversation}
+        onTogglePin={handleTogglePin}
         isOpen={isSidebarOpen}
-        onToggleOpen={() => setIsSidebarOpen(prev => !prev)}
+        onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        settings={settings}
-        onToggleTheme={handleToggleTheme}
+        currentProfile={localProfile}
+        onOpenAccount={() => setIsAccountOpen(true)}
+        onLogoutProfile={handleLogoutProfile}
+        currentThemeId={settings.themeId}
+        onSelectTheme={handleSelectTheme}
       />
 
       {/* Main Chat View */}
@@ -458,10 +606,13 @@ export default function App() {
           isSidebarOpen={isSidebarOpen}
           onNewChat={handleNewChat}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          currentProfile={localProfile}
+          onOpenAccount={() => setIsAccountOpen(true)}
+          currentThemeId={settings.themeId}
         />
       </main>
 
-      {/* Settings Modal */}
+      {/* Settings Modal with 10 Themes */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -469,6 +620,14 @@ export default function App() {
         onSaveSettings={newSettings => setSettings(newSettings)}
         onClearAllChats={handleClearAllChats}
         currentConversation={activeConversation}
+      />
+
+      {/* Account & Profile Modal with Instant Save */}
+      <AccountModal
+        isOpen={isAccountOpen}
+        onClose={() => setIsAccountOpen(false)}
+        currentProfile={localProfile}
+        onSaveProfile={handleSaveProfile}
       />
     </div>
   );

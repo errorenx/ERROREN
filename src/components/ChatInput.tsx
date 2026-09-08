@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, ChangeEvent, KeyboardEvent } from 'react';
-import { ArrowUp, Mic, MicOff, Paperclip, Square, X, Image as ImageIcon } from 'lucide-react';
+import { ArrowUp, Paperclip, Square, X } from 'lucide-react';
 import { MessageAttachment } from '../types';
 
 interface ChatInputProps {
@@ -15,10 +15,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 }) => {
   const [text, setText] = useState('');
   const [attachment, setAttachment] = useState<MessageAttachment | null>(null);
-  const [isListening, setIsListening] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<any>(null);
 
   // Auto-resize textarea height
   useEffect(() => {
@@ -32,69 +30,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   useEffect(() => {
     textareaRef.current?.focus();
   }, []);
-
-  // Web Speech Recognition setup
-  useEffect(() => {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      recognition.onresult = (event: any) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
-        }
-        if (transcript) {
-          setText(prev => (prev ? `${prev} ${transcript}` : transcript));
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.warn('Speech recognition error:', event.error);
-        setIsListening(false);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current = recognition;
-    }
-
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch {
-          // ignore
-        }
-      }
-    };
-  }, []);
-
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-      alert('Speech recognition is not supported in this browser. You can type your question.');
-      return;
-    }
-
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (err) {
-        console.error('Error starting speech recognition:', err);
-      }
-    }
-  };
 
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -120,7 +55,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         data: base64Data,
         previewUrl: dataUrl,
       });
-      // reset file input
       if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsDataURL(file);
@@ -146,12 +80,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     setText('');
     setAttachment(null);
 
-    if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    }
-
-    // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -163,8 +91,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     <div className="w-full max-w-3xl mx-auto px-4 pb-4">
       {/* Attachment Preview */}
       {attachment && (
-        <div className="mb-2 inline-flex items-center gap-2 p-1.5 pr-3 bg-[#0c0c0c] border border-[#1a1a1a] font-mono">
-          <div className="w-10 h-10 bg-black relative shrink-0 border border-[#222]">
+        <div
+          className="mb-2 inline-flex items-center gap-2 p-1.5 pr-3 rounded-lg border font-mono shadow-xs"
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            borderColor: 'var(--border-base)',
+          }}
+        >
+          <div className="w-10 h-10 rounded overflow-hidden relative shrink-0 border" style={{ borderColor: 'var(--border-subtle)' }}>
             <img
               src={attachment.previewUrl}
               alt={attachment.name}
@@ -173,12 +107,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             />
           </div>
           <div className="flex flex-col text-xs max-w-[180px]">
-            <span className="font-bold text-[#00FF66] truncate text-[11px]">{attachment.name}</span>
-            <span className="text-zinc-500 text-[9px] uppercase tracking-wider">Source Vector Attached</span>
+            <span className="font-bold truncate text-[11px]" style={{ color: 'var(--accent)' }}>
+              {attachment.name}
+            </span>
+            <span className="text-[9px] uppercase tracking-wider opacity-60" style={{ color: 'var(--text-muted)' }}>
+              Image Attached
+            </span>
           </div>
           <button
             onClick={() => setAttachment(null)}
-            className="ml-2 p-1 text-zinc-500 hover:text-white hover:bg-[#1a1a1a] transition-colors cursor-pointer"
+            className="ml-2 p-1 rounded opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+            style={{ color: 'var(--text-muted)' }}
             title="Remove attachment"
           >
             <X className="w-3.5 h-3.5" />
@@ -186,35 +125,33 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       )}
 
-      {/* Voice Recording Status */}
-      {isListening && (
-        <div className="mb-2 flex items-center gap-2 px-3 py-1.5 bg-[#0c0c0c] border border-rose-500 text-rose-400 text-xs font-mono w-fit animate-pulse">
-          <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-          <span className="uppercase tracking-wider text-[10px]">Acoustic Capture Active...</span>
-          <button
-            onClick={toggleListening}
-            className="underline font-bold hover:text-white cursor-pointer ml-1 text-[10px] uppercase"
-          >
-            Terminate
-          </button>
-        </div>
-      )}
-
       {/* Main Input Box */}
-      <div className="relative flex flex-col bg-[#0c0c0c] border border-[#1a1a1a] focus-within:border-[#00FF66] shadow-2xl transition-all">
+      <div
+        className="relative flex flex-col rounded-xl border shadow-lg transition-all focus-within:ring-2"
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          borderColor: 'var(--border-base)',
+        }}
+      >
         <textarea
           ref={textareaRef}
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Query the void... (English ya Roman Urdu mein poochein)"
+          placeholder="Ask anything... (English ya Roman Urdu mein likhein)"
           rows={1}
-          className="w-full bg-transparent text-white placeholder:opacity-30 placeholder:text-zinc-400 px-5 pt-4 pb-2 text-sm font-mono resize-none focus:outline-none max-h-[200px] leading-relaxed transition-all"
+          className="w-full bg-transparent px-4 pt-3.5 pb-2 text-sm resize-none focus:outline-none max-h-[200px] leading-relaxed transition-all"
+          style={{
+            color: 'var(--text-primary)',
+          }}
         />
 
         {/* Action bar inside input bottom */}
-        <div className="flex items-center justify-between px-4 pb-3 pt-1 text-zinc-500 font-mono">
-          <div className="flex items-center gap-1.5">
+        <div
+          className="flex items-center justify-between px-3 pb-2.5 pt-1 text-xs"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <div className="flex items-center gap-2">
             {/* File Upload Button */}
             <input
               ref={fileInputRef}
@@ -226,42 +163,31 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 hover:bg-[#1a1a1a] hover:text-[#00FF66] text-zinc-400 transition-colors cursor-pointer"
-              title="Attach image schema"
-              aria-label="Attach image schema"
+              className="p-1.5 rounded-md hover:opacity-100 opacity-70 transition-all cursor-pointer flex items-center gap-1.5 text-xs"
+              style={{
+                color: 'var(--text-secondary)',
+              }}
+              title="Attach image"
+              aria-label="Attach image"
             >
               <Paperclip className="w-4 h-4" />
-            </button>
-
-            {/* Voice Input Button */}
-            <button
-              type="button"
-              onClick={toggleListening}
-              className={`p-1.5 transition-colors cursor-pointer ${
-                isListening
-                  ? 'bg-rose-500/20 text-rose-400 hover:bg-rose-500/30'
-                  : 'hover:bg-[#1a1a1a] hover:text-[#00FF66] text-zinc-400'
-              }`}
-              title={isListening ? 'Stop acoustic capture' : 'Voice dictation'}
-              aria-label="Voice dictation"
-            >
-              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              <span className="text-[11px] hidden sm:inline">Attach</span>
             </button>
           </div>
 
           {/* Submit / Stop Button and Shortcut */}
           <div className="flex items-center gap-3">
-            <div className="text-[10px] opacity-30 font-mono hidden sm:inline select-none">
-              CMD+ENTER
+            <div className="text-[10px] opacity-50 font-mono hidden sm:inline select-none" style={{ color: 'var(--text-muted)' }}>
+              Enter to send
             </div>
 
             {isGenerating ? (
               <button
                 type="button"
                 onClick={onStopGeneration}
-                className="p-2 bg-white hover:bg-rose-500 hover:text-white text-black transition-colors cursor-pointer"
-                title="Halt synthesis"
-                aria-label="Halt synthesis"
+                className="p-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white transition-colors cursor-pointer shadow-xs"
+                title="Stop generation"
+                aria-label="Stop generation"
               >
                 <Square className="w-3.5 h-3.5 fill-current" />
               </button>
@@ -270,25 +196,27 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 type="button"
                 onClick={handleSubmit}
                 disabled={!canSubmit}
-                className={`p-2 transition-colors cursor-pointer ${
-                  canSubmit
-                    ? 'bg-[#00FF66] hover:bg-white text-black'
-                    : 'bg-[#181818] text-zinc-600 cursor-not-allowed'
-                }`}
-                title="Transmit query"
-                aria-label="Transmit query"
+                className="p-2 rounded-lg transition-all cursor-pointer shadow-xs disabled:opacity-30 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: canSubmit ? 'var(--accent)' : 'var(--bg-surface)',
+                  color: canSubmit ? 'var(--accent-text)' : 'var(--text-muted)',
+                }}
+                title="Send message"
+                aria-label="Send message"
               >
-                <ArrowUp className="w-4 h-4 stroke-[3]" />
+                <ArrowUp className="w-4 h-4 stroke-[2.5]" />
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* Cyberpunk artistic footer indicators */}
-      <div className="mt-3 flex justify-between items-center opacity-30 text-[9px] uppercase tracking-[0.2em] font-mono select-none px-1">
-        <span>End-to-End Latent Encryption Active</span>
-        <span className="hidden sm:inline">Built on Error-First Architecture</span>
+      <div
+        className="mt-2 flex justify-between items-center text-[10px] font-mono select-none px-1 opacity-50"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        <span>ERROREN AI</span>
+        <span>Shift+Enter for new line</span>
       </div>
     </div>
   );

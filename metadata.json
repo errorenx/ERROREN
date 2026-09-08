@@ -1,9 +1,7 @@
 {
   "name": "ERROREN",
-  "description": "A fast and powerful AI assistant inspired by ChatGPT, featuring conversational memory, multi-modal analysis, and code synthesis.",
-  "requestFramePermissions": [
-    "microphone"
-  ],
+  "description": "A fast and powerful AI assistant inspired by ChatGPT with Google Authentication and Cloud Firestore database backup.",
+  "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]

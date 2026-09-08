@@ -1,7 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import {
   Menu,
-  Sparkles,
   Share2,
   Plus,
   Code2,
@@ -9,10 +8,13 @@ import {
   FileText,
   Languages,
   ArrowRight,
+  User,
+  Palette,
 } from 'lucide-react';
-import { Conversation, MessageAttachment, ChatMessage } from '../types';
+import { Conversation, MessageAttachment, UserProfile } from '../types';
 import { MessageItem } from './MessageItem';
 import { ChatInput } from './ChatInput';
+import { ThemeId, THEMES } from '../utils/theme';
 
 interface ChatAreaProps {
   conversation: Conversation;
@@ -26,13 +28,16 @@ interface ChatAreaProps {
   isSidebarOpen: boolean;
   onNewChat: () => void;
   onOpenSettings: () => void;
+  currentProfile: UserProfile | null;
+  onOpenAccount: () => void;
+  currentThemeId: ThemeId;
 }
 
 const STARTER_PROMPTS = [
   {
     icon: Code2,
     category: 'Code & Debug',
-    title: 'Python / React Code',
+    title: 'TypeScript & React',
     prompt: 'Write a clean TypeScript React hook for debouncing search input with examples.',
   },
   {
@@ -44,14 +49,14 @@ const STARTER_PROMPTS = [
   {
     icon: Lightbulb,
     category: 'Brainstorm & Ideas',
-    title: 'Startup Concepts',
-    prompt: 'Give me 3 practical, high-impact business ideas leveraging Gemini AI in 2026.',
+    title: 'Product Concepts',
+    prompt: 'Give me 3 practical, high-impact business ideas leveraging modern AI in 2026.',
   },
   {
     icon: FileText,
-    category: 'Writing & Letters',
+    category: 'Writing & Analysis',
     title: 'Professional Email',
-    prompt: 'Draft a polite and persuasive proposal email to a prospective software client.',
+    prompt: 'Draft a polite, persuasive proposal email to a prospective software client.',
   },
 ];
 
@@ -67,8 +72,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   isSidebarOpen,
   onNewChat,
   onOpenSettings,
+  currentProfile,
+  onOpenAccount,
+  currentThemeId,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const activeTheme = THEMES[currentThemeId];
 
   const scrollToBottom = (smooth = true) => {
     messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
@@ -79,7 +88,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   }, [conversation.id]);
 
   useEffect(() => {
-    // When messages change or are streaming
     scrollToBottom(true);
   }, [conversation.messages, conversation.messages.length]);
 
@@ -100,19 +108,32 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         alert('Conversation copied to clipboard!');
       }
     } catch {
-      // User cancelled or clipboard permission denied
+      // User dismissed or clipboard denied
     }
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#050505] text-[#e0e0e0] overflow-hidden relative">
+    <div
+      className="flex-1 flex flex-col h-full overflow-hidden relative transition-colors"
+      style={{
+        backgroundColor: 'var(--bg-base)',
+        color: 'var(--text-primary)',
+      }}
+    >
       {/* Top Header Bar */}
-      <header className="h-16 shrink-0 flex items-center justify-between px-4 sm:px-8 md:px-10 border-b border-[#1a1a1a] bg-[#050505]/80 backdrop-blur-md z-10">
+      <header
+        className="h-16 shrink-0 flex items-center justify-between px-4 sm:px-6 border-b z-10 transition-colors"
+        style={{
+          backgroundColor: 'var(--bg-surface)',
+          borderColor: 'var(--border-subtle)',
+        }}
+      >
         <div className="flex items-center gap-3">
           {!isSidebarOpen && (
             <button
               onClick={onToggleSidebar}
-              className="p-1.5 rounded text-zinc-400 hover:text-[#00FF66] hover:bg-[#111] transition-colors cursor-pointer"
+              className="p-1.5 rounded transition-colors cursor-pointer opacity-75 hover:opacity-100"
+              style={{ color: 'var(--text-primary)' }}
               title="Open sidebar"
               aria-label="Open sidebar"
             >
@@ -121,34 +142,90 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           )}
 
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#00FF66] animate-pulse" />
-            <span className="text-[11px] uppercase tracking-widest opacity-60 font-mono">
-              Operational: Low Latency
+            <span
+              className="w-2 h-2 rounded-full animate-pulse"
+              style={{ backgroundColor: 'var(--accent)' }}
+            />
+            <span
+              className="text-xs uppercase tracking-widest font-mono font-bold"
+              style={{ color: 'var(--accent)' }}
+            >
+              ERROREN
+            </span>
+            <span className="text-[11px] font-mono opacity-50 hidden sm:inline" style={{ color: 'var(--text-muted)' }}>
+              / {conversation.title}
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4 text-[11px] uppercase tracking-widest opacity-60 font-mono">
-          <span className="hidden sm:inline">Context: 128k</span>
-          <span className="hidden md:inline">Tokens: 8.4m</span>
+        <div className="flex items-center gap-2.5 text-xs font-mono">
+          {/* User Profile / Account Trigger */}
+          <button
+            onClick={onOpenAccount}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border transition-all cursor-pointer opacity-90 hover:opacity-100"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              borderColor: 'var(--border-subtle)',
+              color: 'var(--text-primary)',
+            }}
+            title="User Profile & Settings"
+          >
+            <div
+              className="w-4 h-4 rounded-full flex items-center justify-center font-bold text-[9px]"
+              style={{
+                backgroundColor: 'var(--accent)',
+                color: 'var(--accent-text)',
+              }}
+            >
+              {currentProfile?.name ? currentProfile.name.charAt(0).toUpperCase() : <User className="w-2.5 h-2.5" />}
+            </div>
+            <span className="text-[11px] font-medium hidden sm:inline truncate max-w-[100px]">
+              {currentProfile?.name || 'Account'}
+            </span>
+          </button>
 
-          <div className="flex items-center gap-2 border-l border-[#1a1a1a] pl-4">
+          {/* Quick Theme Switcher Trigger */}
+          <button
+            onClick={onOpenSettings}
+            className="p-1.5 rounded-md border transition-all cursor-pointer opacity-80 hover:opacity-100"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              borderColor: 'var(--border-subtle)',
+              color: 'var(--accent)',
+            }}
+            title={`Active Theme: ${activeTheme.name}`}
+            aria-label="Change Theme"
+          >
+            <Palette className="w-4 h-4" />
+          </button>
+
+          <div className="flex items-center gap-1.5 border-l pl-2.5" style={{ borderColor: 'var(--border-subtle)' }}>
             <button
               onClick={onNewChat}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-[#111] hover:border-[#00FF66] border border-[#222] text-[#e0e0e0] hover:text-[#00FF66] text-[10px] font-mono uppercase tracking-wider transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[11px] font-mono uppercase tracking-wider transition-all cursor-pointer opacity-90 hover:opacity-100"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-subtle)',
+                color: 'var(--text-primary)',
+              }}
               title="Start fresh conversation"
             >
-              <Plus className="w-3 h-3" />
-              <span>Reset</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">New Chat</span>
             </button>
 
             <button
               onClick={handleShare}
-              className="p-1.5 bg-[#111] hover:border-[#00FF66] border border-[#222] text-[#e0e0e0] hover:text-[#00FF66] transition-colors cursor-pointer"
+              className="p-1.5 rounded-md border transition-all cursor-pointer opacity-80 hover:opacity-100"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-subtle)',
+                color: 'var(--text-secondary)',
+              }}
               title="Share or copy conversation"
               aria-label="Share or copy conversation"
             >
-              <Share2 className="w-3.5 h-3.5" />
+              <Share2 className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -160,19 +237,32 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <div className="min-h-full flex flex-col justify-center items-center px-4 py-8 max-w-3xl mx-auto">
             {/* Logo Emblem */}
             <div className="relative mb-6">
-              <div className="w-14 h-14 border border-[#00FF66] flex items-center justify-center text-[#00FF66] font-mono text-xl font-bold shadow-[0_0_25px_rgba(0,255,102,0.15)] bg-[#050505]">
+              <div
+                className="w-14 h-14 rounded-xl border flex items-center justify-center font-mono text-xl font-bold shadow-lg"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: 'var(--accent)',
+                  color: 'var(--accent)',
+                }}
+              >
                 <span>ERR</span>
               </div>
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#00FF66] flex items-center justify-center text-black text-[10px] font-bold font-mono">
+              <div
+                className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold font-mono"
+                style={{
+                  backgroundColor: 'var(--accent)',
+                  color: 'var(--accent-text)',
+                }}
+              >
                 +
               </div>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-black text-white text-center tracking-tight mb-2 font-mono">
-              QUERY THE VOID
+            <h1 className="text-2xl sm:text-3xl font-black text-center tracking-tight mb-2 font-mono" style={{ color: 'var(--text-primary)' }}>
+              SYNTHETIC INTELLIGENCE
             </h1>
-            <p className="text-zinc-400 text-xs sm:text-sm text-center max-w-md mb-8 leading-relaxed font-mono opacity-70">
-              State your deviance. Ask technical questions, dissect architecture, analyze code, or query in English &amp; Roman Urdu.
+            <p className="text-xs sm:text-sm text-center max-w-md mb-8 leading-relaxed font-mono opacity-70" style={{ color: 'var(--text-muted)' }}>
+              Ask technical questions, dissect architecture, analyze code, or converse in English &amp; Roman Urdu.
             </p>
 
             {/* Starter Prompt Cards */}
@@ -183,18 +273,22 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   <button
                     key={idx}
                     onClick={() => onSendMessage(item.prompt)}
-                    className="flex flex-col text-left p-4 bg-[#0c0c0c] hover:bg-[#111] border border-[#1a1a1a] hover:border-[#00FF66] transition-all group cursor-pointer"
+                    className="flex flex-col text-left p-4 rounded-xl border transition-all group cursor-pointer"
+                    style={{
+                      backgroundColor: 'var(--bg-card)',
+                      borderColor: 'var(--border-base)',
+                    }}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <IconComponent className="w-3.5 h-3.5 text-[#00FF66]" />
-                        <span className="text-[10px] font-mono text-[#00FF66] uppercase tracking-widest opacity-80">
+                        <IconComponent className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+                        <span className="text-[10px] font-mono uppercase tracking-widest font-bold" style={{ color: 'var(--accent)' }}>
                           {item.category}
                         </span>
                       </div>
-                      <ArrowRight className="w-3 h-3 text-zinc-600 group-hover:text-[#00FF66] group-hover:translate-x-0.5 transition-all" />
+                      <ArrowRight className="w-3 h-3 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" style={{ color: 'var(--accent)' }} />
                     </div>
-                    <span className="text-xs font-mono text-zinc-300 group-hover:text-white line-clamp-2 leading-relaxed">
+                    <span className="text-xs font-mono leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                       {item.prompt}
                     </span>
                   </button>
@@ -227,7 +321,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       </div>
 
       {/* Input Area */}
-      <div className="shrink-0 pt-2 bg-gradient-to-t from-[#050505] via-[#050505]/90 to-transparent">
+      <div
+        className="shrink-0 pt-2 transition-colors"
+        style={{
+          background: `linear-gradient(to top, var(--bg-base) 80%, transparent)`,
+        }}
+      >
         <ChatInput
           onSendMessage={onSendMessage}
           isGenerating={isGenerating}

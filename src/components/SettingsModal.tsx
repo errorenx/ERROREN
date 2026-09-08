@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sliders, Volume2, Trash2, Download, ShieldCheck, Sparkles, Command } from 'lucide-react';
+import { X, Sliders, Trash2, Download, Sparkles, Command, Palette } from 'lucide-react';
 import { AppSettings, Conversation } from '../types';
+import { ThemeSelector } from './ThemeSelector';
+import { ThemeId, applyTheme, THEMES } from '../utils/theme';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -20,26 +22,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   currentConversation,
 }) => {
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
-  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [activeTab, setActiveTab] = useState<'appearance' | 'system' | 'data'>('appearance');
 
   useEffect(() => {
     setLocalSettings(settings);
-  }, [settings]);
-
-  useEffect(() => {
-    if ('speechSynthesis' in window) {
-      const loadVoices = () => {
-        const voices = window.speechSynthesis.getVoices();
-        setAvailableVoices(voices);
-      };
-      loadVoices();
-      window.speechSynthesis.onvoiceschanged = loadVoices;
-    }
-  }, []);
+  }, [settings, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
+  const handleSelectTheme = (themeId: ThemeId) => {
+    const selectedMode = THEMES[themeId]?.mode || 'dark';
+    const updated = {
+      ...localSettings,
+      themeId,
+      themeMode: selectedMode,
+    };
+    setLocalSettings(updated);
+    // Apply live immediately for seamless feedback
+    applyTheme(themeId);
+    onSaveSettings(updated);
+  };
+
+  const handleSaveAndClose = () => {
     onSaveSettings(localSettings);
     onClose();
   };
@@ -49,9 +53,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       alert('No messages to export.');
       return;
     }
-    let md = `# ${currentConversation.title}\n*Exported from ERROREN AI on ${new Date().toLocaleString()}*\n\n---\n\n`;
+    let md = `# ${currentConversation.title}\n*Exported from ERROREN on ${new Date().toLocaleString()}*\n\n---\n\n`;
     currentConversation.messages.forEach(m => {
-      const roleName = m.role === 'user' ? 'You' : 'ERROREN';
+      const roleName = m.role === 'user' ? 'User' : 'ERROREN';
       md += `### ${roleName} (${new Date(m.timestamp).toLocaleTimeString()}):\n\n${m.content}\n\n---\n\n`;
     });
 
@@ -65,127 +69,287 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-      <div className="relative w-full max-w-lg bg-[#080808] border border-[#1a1a1a] shadow-2xl text-[#e0e0e0] overflow-hidden font-mono">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in">
+      <div
+        className="relative w-full max-w-2xl rounded-xl border shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transition-all"
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          borderColor: 'var(--border-base)',
+          color: 'var(--text-primary)',
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#1a1a1a] bg-[#050505]">
+        <div
+          className="flex items-center justify-between px-6 py-4 border-b shrink-0"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-subtle)',
+          }}
+        >
           <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 border border-[#00FF66] flex items-center justify-center text-[#00FF66]">
-              <Sliders className="w-3.5 h-3.5" />
+            <div
+              className="w-7 h-7 rounded-md flex items-center justify-center"
+              style={{
+                backgroundColor: 'var(--accent-subtle)',
+                color: 'var(--accent)',
+              }}
+            >
+              <Sliders className="w-4 h-4" />
             </div>
-            <h2 className="text-sm font-bold uppercase tracking-widest text-[#00FF66]">Config Schema // Settings</h2>
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-wider">
+                Preferences &amp; Settings
+              </h2>
+              <p className="text-[11px] opacity-70" style={{ color: 'var(--text-muted)' }}>
+                Customize color theme, persona, and storage
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-zinc-500 hover:text-[#00FF66] transition-colors cursor-pointer"
+            className="p-1 rounded opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+            style={{ color: 'var(--text-muted)' }}
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto text-xs">
-          {/* Custom System Persona */}
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 font-bold uppercase tracking-wider text-zinc-200">
-              <Sparkles className="w-3.5 h-3.5 text-[#00FF66]" />
-              System Persona Directive
-            </label>
-            <p className="text-[11px] text-zinc-500 leading-normal">
-              Define latent instructions for ERROREN (e.g. &ldquo;Hamesha Roman Urdu mein jawab dein&rdquo; or &ldquo;Maintain poetic precision&rdquo;).
-            </p>
-            <textarea
-              value={localSettings.systemPrompt}
-              onChange={e => setLocalSettings({ ...localSettings, systemPrompt: e.target.value })}
-              placeholder="e.g. You are ERROREN. Answer with high technical precision and concise structure..."
-              rows={3}
-              className="w-full p-3 bg-[#0c0c0c] border border-[#1a1a1a] focus:border-[#00FF66] text-zinc-200 placeholder-zinc-700 focus:outline-none text-xs font-mono leading-relaxed transition-colors"
-            />
-          </div>
+        {/* Tab Navigation */}
+        <div
+          className="flex items-center gap-2 px-6 pt-3 border-b text-xs shrink-0"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-subtle)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setActiveTab('appearance')}
+            className={`pb-2.5 font-bold uppercase tracking-wider text-[11px] border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'appearance' ? 'opacity-100' : 'opacity-60 hover:opacity-90'
+            }`}
+            style={{
+              borderColor: activeTab === 'appearance' ? 'var(--accent)' : 'transparent',
+              color: activeTab === 'appearance' ? 'var(--text-primary)' : 'var(--text-muted)',
+            }}
+          >
+            <Palette className="w-3.5 h-3.5" />
+            <span>10 Color Themes</span>
+          </button>
 
-          {/* Voice & Speech synthesis */}
-          <div className="space-y-3 pt-4 border-t border-[#1a1a1a]">
-            <label className="flex items-center gap-2 font-bold uppercase tracking-wider text-zinc-200">
-              <Volume2 className="w-3.5 h-3.5 text-[#00FF66]" />
-              Auditory Synthesis Engine
-            </label>
-            <div className="space-y-2">
-              <select
-                value={localSettings.speechVoiceName}
-                onChange={e => setLocalSettings({ ...localSettings, speechVoiceName: e.target.value })}
-                className="w-full p-2.5 bg-[#0c0c0c] border border-[#1a1a1a] focus:border-[#00FF66] text-zinc-300 text-xs focus:outline-none font-mono"
-              >
-                <option value="">Default System Voice</option>
-                {availableVoices.map(voice => (
-                  <option key={voice.name} value={voice.name}>
-                    {voice.name} ({voice.lang})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('system')}
+            className={`pb-2.5 font-bold uppercase tracking-wider text-[11px] border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'system' ? 'opacity-100' : 'opacity-60 hover:opacity-90'
+            }`}
+            style={{
+              borderColor: activeTab === 'system' ? 'var(--accent)' : 'transparent',
+              color: activeTab === 'system' ? 'var(--text-primary)' : 'var(--text-muted)',
+            }}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>AI Persona</span>
+          </button>
 
-          {/* Keyboard Shortcuts Reference */}
-          <div className="space-y-2 pt-4 border-t border-[#1a1a1a]">
-            <label className="flex items-center gap-2 font-bold uppercase tracking-wider text-zinc-200">
-              <Command className="w-3.5 h-3.5 text-zinc-400" />
-              Keyboard Operations
-            </label>
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <div className="p-2.5 bg-[#0c0c0c] border border-[#1a1a1a] flex justify-between items-center">
-                <span className="text-zinc-500">Query Void</span>
-                <kbd className="px-1.5 py-0.5 bg-[#181818] text-[#00FF66] font-mono text-[10px] border border-[#222]">Enter</kbd>
+          <button
+            type="button"
+            onClick={() => setActiveTab('data')}
+            className={`pb-2.5 font-bold uppercase tracking-wider text-[11px] border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'data' ? 'opacity-100' : 'opacity-60 hover:opacity-90'
+            }`}
+            style={{
+              borderColor: activeTab === 'data' ? 'var(--accent)' : 'transparent',
+              color: activeTab === 'data' ? 'var(--text-primary)' : 'var(--text-muted)',
+            }}
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Data &amp; Shortcuts</span>
+          </button>
+        </div>
+
+        {/* Tab Body */}
+        <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+          {activeTab === 'appearance' && (
+            <div>
+              <div className="mb-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
+                  Color Theme Selection
+                </h3>
+                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  Switch between 5 curated dark themes and 5 elegant light themes. Instantly applied across all buttons, sidebars, cards, and chats.
+                </p>
               </div>
-              <div className="p-2.5 bg-[#0c0c0c] border border-[#1a1a1a] flex justify-between items-center">
-                <span className="text-zinc-500">New Line</span>
-                <kbd className="px-1.5 py-0.5 bg-[#181818] text-zinc-300 font-mono text-[10px] border border-[#222]">Shift+Enter</kbd>
-              </div>
+
+              <ThemeSelector
+                currentThemeId={localSettings.themeId}
+                onSelectTheme={handleSelectTheme}
+              />
             </div>
-          </div>
+          )}
 
-          {/* Export & Data Management */}
-          <div className="space-y-3 pt-4 border-t border-[#1a1a1a]">
-            <label className="font-bold uppercase tracking-wider text-zinc-200 block">Session State &amp; Ledger</label>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleExportMarkdown}
-                className="flex items-center gap-1.5 px-3 py-2 bg-[#111] hover:border-[#00FF66] hover:text-[#00FF66] text-zinc-300 text-xs border border-[#222] transition-colors cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Export Active Schema (.md)
-              </button>
+          {activeTab === 'system' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-primary)' }}>
+                  System Instructions &amp; Persona
+                </label>
+                <p className="text-[11px] mb-2" style={{ color: 'var(--text-muted)' }}>
+                  Add custom behavioral guidance (e.g. &ldquo;Always answer in Roman Urdu&rdquo;, &ldquo;Focus on Python code efficiency&rdquo;, or &ldquo;Keep answers brief&rdquo;).
+                </p>
+                <textarea
+                  value={localSettings.systemPrompt}
+                  onChange={e => setLocalSettings({ ...localSettings, systemPrompt: e.target.value })}
+                  placeholder="e.g. You are ERROREN. Assist with accurate, step-by-step code and clear explanations in English and Roman Urdu..."
+                  rows={4}
+                  className="w-full p-3 rounded-md border text-xs outline-none transition-colors font-mono leading-relaxed"
+                  style={{
+                    backgroundColor: 'var(--bg-base)',
+                    borderColor: 'var(--border-base)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+              </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (confirm('Are you sure you want to purge all sessions? This cannot be reversed.')) {
-                    onClearAllChats();
-                    onClose();
-                  }
+              <div
+                className="p-3.5 rounded-lg border flex items-center justify-between"
+                style={{
+                  backgroundColor: 'var(--bg-base)',
+                  borderColor: 'var(--border-subtle)',
                 }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-[#111] hover:bg-rose-950/40 text-rose-400 text-xs border border-rose-900/40 hover:border-rose-500 transition-colors cursor-pointer"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                Purge All Sessions
-              </button>
+                <div>
+                  <div className="font-bold text-xs" style={{ color: 'var(--text-primary)' }}>
+                    Real-time Token Streaming
+                  </div>
+                  <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    Display AI output progressively token-by-token
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={localSettings.streamResponses}
+                  onChange={e => setLocalSettings({ ...localSettings, streamResponses: e.target.checked })}
+                  className="w-4 h-4 cursor-pointer"
+                  style={{ accentColor: 'var(--accent)' }}
+                />
+              </div>
             </div>
-          </div>
+          )}
+
+          {activeTab === 'data' && (
+            <div className="space-y-5">
+              {/* Keyboard Shortcuts */}
+              <div>
+                <label className="flex items-center gap-2 font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-primary)' }}>
+                  <Command className="w-3.5 h-3.5 text-zinc-400" />
+                  Keyboard Operations
+                </label>
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div
+                    className="p-2.5 rounded-md border flex justify-between items-center"
+                    style={{
+                      backgroundColor: 'var(--bg-base)',
+                      borderColor: 'var(--border-subtle)',
+                    }}
+                  >
+                    <span style={{ color: 'var(--text-muted)' }}>Send Message</span>
+                    <kbd
+                      className="px-2 py-0.5 rounded font-mono text-[10px] border"
+                      style={{
+                        backgroundColor: 'var(--bg-card)',
+                        borderColor: 'var(--border-base)',
+                        color: 'var(--accent)',
+                      }}
+                    >
+                      Enter
+                    </kbd>
+                  </div>
+                  <div
+                    className="p-2.5 rounded-md border flex justify-between items-center"
+                    style={{
+                      backgroundColor: 'var(--bg-base)',
+                      borderColor: 'var(--border-subtle)',
+                    }}
+                  >
+                    <span style={{ color: 'var(--text-muted)' }}>New Line</span>
+                    <kbd
+                      className="px-2 py-0.5 rounded font-mono text-[10px] border"
+                      style={{
+                        backgroundColor: 'var(--bg-card)',
+                        borderColor: 'var(--border-base)',
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      Shift+Enter
+                    </kbd>
+                  </div>
+                </div>
+              </div>
+
+              {/* Export & Purge */}
+              <div className="space-y-3 pt-3 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+                <label className="font-bold uppercase tracking-wider block" style={{ color: 'var(--text-primary)' }}>
+                  Session Storage &amp; Backup
+                </label>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleExportMarkdown}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-md border text-xs transition-colors cursor-pointer"
+                    style={{
+                      backgroundColor: 'var(--bg-base)',
+                      borderColor: 'var(--border-base)',
+                      color: 'var(--text-primary)',
+                    }}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export Active Chat (.md)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm('Are you sure you want to clear all conversations? This action cannot be undone.')) {
+                        onClearAllChats();
+                        onClose();
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-md border text-xs text-rose-400 border-rose-900/40 hover:border-rose-500 bg-rose-950/20 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Clear All Conversations</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#1a1a1a] bg-[#050505]">
+        <div
+          className="flex items-center justify-end gap-3 px-6 py-3.5 border-t shrink-0"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-subtle)',
+          }}
+        >
           <button
             onClick={onClose}
-            className="px-4 py-1.5 text-xs text-zinc-500 hover:text-white uppercase tracking-wider transition-colors cursor-pointer"
+            className="px-4 py-1.5 text-xs opacity-70 hover:opacity-100 uppercase tracking-wider transition-opacity cursor-pointer"
+            style={{ color: 'var(--text-muted)' }}
           >
-            Abort
+            Close
           </button>
           <button
-            onClick={handleSave}
-            className="px-4 py-1.5 text-xs font-bold uppercase tracking-wider bg-[#00FF66] hover:bg-white text-black transition-colors cursor-pointer"
+            onClick={handleSaveAndClose}
+            className="px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer shadow-xs"
+            style={{
+              backgroundColor: 'var(--accent)',
+              color: 'var(--accent-text)',
+            }}
           >
-            Commit Changes
+            Done
           </button>
         </div>
       </div>

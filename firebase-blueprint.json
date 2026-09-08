@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information",
+      "fields": {
+        "email": { "type": "string", "description": "Email address" },
+        "displayName": { "type": "string", "description": "Display name" },
+        "photoURL": { "type": "string", "description": "Avatar URL" },
+        "createdAt": { "type": "number", "description": "Account created timestamp" },
+        "updatedAt": { "type": "number", "description": "Last login timestamp" }
+      }
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "User chat conversation session with messages and metadata",
+      "fields": {
+        "id": { "type": "string", "description": "Conversation ID" },
+        "userId": { "type": "string", "description": "Owner UID" },
+        "title": { "type": "string", "description": "Conversation title" },
+        "createdAt": { "type": "number", "description": "Creation timestamp" },
+        "updatedAt": { "type": "number", "description": "Last update timestamp" },
+        "messages": { "type": "array", "description": "List of chat messages" }
+      }
+    }
+  }
+}

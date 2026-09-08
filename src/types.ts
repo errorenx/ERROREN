@@ -1,3 +1,5 @@
+import { ThemeId, ThemeMode } from './utils/theme';
+
 export interface MessageAttachment {
   name: string;
   mimeType: string;
@@ -26,9 +28,23 @@ export interface Conversation {
 }
 
 export interface AppSettings {
-  theme: 'dark' | 'light' | 'system';
+  themeId: ThemeId;
+  themeMode: ThemeMode;
   systemPrompt: string;
-  speechVoiceName: string;
-  speechRate: number;
   streamResponses: boolean;
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  savedAt: number;
+}
+
+export interface UserAuthProfile {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
 }

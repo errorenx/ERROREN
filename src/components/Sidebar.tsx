@@ -2,72 +2,73 @@ import React, { useState } from 'react';
 import {
   Plus,
   MessageSquare,
-  Trash2,
-  Edit3,
-  Check,
-  X,
   Search,
-  Settings,
+  Trash2,
+  Pin,
+  Sliders,
+  ChevronLeft,
+  X,
+  User,
+  Palette,
   Sun,
   Moon,
-  Sparkles,
-  Pin,
-  ChevronLeft,
+  LogOut,
 } from 'lucide-react';
-import { Conversation, AppSettings } from '../types';
+import { Conversation, UserProfile } from '../types';
+import { ThemeId, THEMES } from '../utils/theme';
 
 interface SidebarProps {
   conversations: Conversation[];
   activeId: string;
   onSelectConversation: (id: string) => void;
-  onNewChat: () => void;
+  onNewConversation: () => void;
   onDeleteConversation: (id: string) => void;
-  onRenameConversation: (id: string, newTitle: string) => void;
-  isOpen: boolean;
-  onToggleOpen: () => void;
+  onTogglePin: (id: string) => void;
   onOpenSettings: () => void;
-  settings: AppSettings;
-  onToggleTheme: () => void;
+  isOpen: boolean;
+  onToggleSidebar: () => void;
+  currentProfile: UserProfile | null;
+  onOpenAccount: () => void;
+  onLogoutProfile?: () => void;
+  currentThemeId: ThemeId;
+  onSelectTheme: (themeId: ThemeId) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   conversations,
   activeId,
   onSelectConversation,
-  onNewChat,
+  onNewConversation,
   onDeleteConversation,
-  onRenameConversation,
-  isOpen,
-  onToggleOpen,
+  onTogglePin,
   onOpenSettings,
-  settings,
-  onToggleTheme,
+  isOpen,
+  onToggleSidebar,
+  currentProfile,
+  onOpenAccount,
+  onLogoutProfile,
+  currentThemeId,
+  onSelectTheme,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState('');
 
+  const activeTheme = THEMES[currentThemeId];
+
+  // Filter conversations by query
   const filteredConversations = conversations.filter(c =>
     c.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const startRename = (c: Conversation, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingId(c.id);
-    setEditTitle(c.title);
-  };
+  // Separate pinned and unpinned
+  const pinnedConversations = filteredConversations.filter(c => c.pinned);
+  const regularConversations = filteredConversations.filter(c => !c.pinned);
 
-  const saveRename = (id: string, e: React.MouseEvent | React.FormEvent) => {
-    e.stopPropagation();
-    if (editTitle.trim()) {
-      onRenameConversation(id, editTitle.trim());
+  const toggleThemeMode = () => {
+    if (activeTheme.mode === 'dark') {
+      onSelectTheme('clean-white');
+    } else {
+      onSelectTheme('midnight-blue');
     }
-    setEditingId(null);
-  };
-
-  const cancelRename = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingId(null);
   };
 
   return (
@@ -75,196 +76,329 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Backdrop */}
       {isOpen && (
         <div
-          onClick={onToggleOpen}
-          className="fixed inset-0 z-30 bg-black/60 md:hidden backdrop-blur-xs transition-opacity"
+          className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-xs"
+          onClick={onToggleSidebar}
         />
       )}
 
-      {/* Sidebar Container */}
+      {/* Main Sidebar Container */}
       <aside
-        id="app-sidebar"
-        className={`fixed md:static inset-y-0 left-0 z-40 flex flex-col justify-between w-[280px] bg-[#080808] border-r border-[#1a1a1a] text-[#e0e0e0] transition-transform duration-200 ease-in-out select-none ${
-          isOpen ? 'translate-x-0' : '-translate-x-full md:-translate-x-full'
-        } shrink-0`}
+        className={`fixed md:static inset-y-0 left-0 z-40 w-72 flex flex-col transition-transform duration-200 ease-in-out border-r ${
+          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0 md:hidden'
+        }`}
+        style={{
+          backgroundColor: 'var(--bg-surface)',
+          borderColor: 'var(--border-base)',
+          color: 'var(--text-primary)',
+        }}
       >
-        <div className="flex flex-col h-full overflow-hidden p-5">
-          {/* Top Header / App Branding */}
-          <div className="mb-6 flex items-start justify-between">
-            <div>
-              <h1 className="text-3xl font-black tracking-tighter text-[#00FF66] mb-0.5">
-                ERROREN
-              </h1>
-              <p className="text-[10px] uppercase tracking-[0.3em] opacity-40 font-mono text-zinc-400">
-                Synthetic Intelligence v.4.0
-              </p>
+        {/* Top Branding */}
+        <div
+          className="p-4 border-b flex items-center justify-between shrink-0"
+          style={{ borderColor: 'var(--border-subtle)' }}
+        >
+          <div className="flex items-center gap-2.5">
+            <div
+              className="w-8 h-8 rounded-md flex items-center justify-center font-mono text-sm font-black transition-transform hover:scale-105"
+              style={{
+                backgroundColor: 'var(--accent)',
+                color: 'var(--accent-text)',
+              }}
+            >
+              ERR
             </div>
-
-            <button
-              onClick={onToggleOpen}
-              className="p-1.5 rounded text-zinc-500 hover:text-white hover:bg-[#111] transition-colors cursor-pointer md:flex"
-              title="Collapse sidebar"
-              aria-label="Collapse sidebar"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* New Chat Button */}
-          <div className="mb-4">
-            <button
-              onClick={onNewChat}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 bg-[#111111] hover:bg-[#1a1a1a] active:bg-[#222] border border-[#222] hover:border-[#00FF66] text-[#e0e0e0] text-xs font-mono tracking-wider shadow-xs transition-all group cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <Plus className="w-3.5 h-3.5 text-[#00FF66]" />
-                <span className="uppercase text-[11px] font-bold tracking-widest text-white">Initialize Flux</span>
+            <div>
+              <div className="font-mono text-sm font-black tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
+                <span>ERROREN</span>
               </div>
-              <span className="text-[9px] font-mono text-zinc-500 group-hover:text-[#00FF66] border border-[#333] px-1 py-0.5">
-                CMD+K
-              </span>
-            </button>
+              <div className="text-[10px] font-mono tracking-widest uppercase opacity-60" style={{ color: 'var(--text-muted)' }}>
+                Synthetic Intelligence
+              </div>
+            </div>
           </div>
 
-          {/* Search input */}
-          {conversations.length > 2 && (
-            <div className="mb-4">
-              <div className="relative flex items-center">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 text-zinc-500" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Filter sessions..."
-                  className="w-full pl-8 pr-3 py-1.5 bg-[#0c0c0c] border border-[#1a1a1a] text-zinc-200 placeholder-zinc-600 text-xs font-mono focus:outline-none focus:border-[#00FF66] transition-colors"
-                />
+          <div className="flex items-center gap-1">
+            <button
+              onClick={toggleThemeMode}
+              className="p-1.5 rounded opacity-75 hover:opacity-100 transition-opacity cursor-pointer"
+              style={{ color: 'var(--text-secondary)' }}
+              title={activeTheme.mode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {activeTheme.mode === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={onToggleSidebar}
+              className="p-1.5 rounded opacity-75 hover:opacity-100 transition-opacity cursor-pointer md:hidden"
+              style={{ color: 'var(--text-secondary)' }}
+              title="Close sidebar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* New Chat Button */}
+        <div className="p-3 shrink-0">
+          <button
+            onClick={onNewConversation}
+            className="w-full flex items-center justify-between py-2.5 px-3.5 rounded-lg border font-mono text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-xs"
+            style={{
+              backgroundColor: 'var(--accent-subtle)',
+              borderColor: 'var(--accent)',
+              color: 'var(--accent)',
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              <span>New Thread</span>
+            </div>
+            <span className="text-[9px] px-1.5 py-0.5 rounded opacity-80" style={{ backgroundColor: 'var(--bg-card)' }}>
+              +
+            </span>
+          </button>
+        </div>
+
+        {/* Search Conversations */}
+        <div className="px-3 pb-2 shrink-0">
+          <div
+            className="relative flex items-center rounded-md border"
+            style={{
+              backgroundColor: 'var(--bg-base)',
+              borderColor: 'var(--border-subtle)',
+            }}
+          >
+            <Search className="w-3.5 h-3.5 ml-2.5 opacity-50 shrink-0" style={{ color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search chat history..."
+              className="w-full py-1.5 px-2 text-xs outline-none bg-transparent"
+              style={{ color: 'var(--text-primary)' }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="p-1 mr-1 text-xs opacity-60 hover:opacity-100 cursor-pointer"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Conversation List */}
+        <div className="flex-1 overflow-y-auto px-2 space-y-3 py-1 text-xs font-mono">
+          {/* Pinned Section */}
+          {pinnedConversations.length > 0 && (
+            <div>
+              <div className="px-2 py-1 text-[10px] uppercase font-bold tracking-wider flex items-center gap-1 opacity-60" style={{ color: 'var(--text-muted)' }}>
+                <Pin className="w-2.5 h-2.5" />
+                <span>Pinned</span>
+              </div>
+              <div className="space-y-1 mt-1">
+                {pinnedConversations.map(conv => (
+                  <ConversationItem
+                    key={conv.id}
+                    conversation={conv}
+                    isActive={conv.id === activeId}
+                    onSelect={() => onSelectConversation(conv.id)}
+                    onDelete={() => onDeleteConversation(conv.id)}
+                    onTogglePin={() => onTogglePin(conv.id)}
+                  />
+                ))}
               </div>
             </div>
           )}
 
-          {/* Conversation List */}
-          <div className="flex-1 overflow-y-auto pr-1 space-y-1">
-            <p className="text-[10px] uppercase tracking-widest text-[#00FF66] mb-3 opacity-70 font-mono">
-              Recent Sessions ({filteredConversations.length})
-            </p>
-
-            {filteredConversations.length === 0 ? (
-              <div className="py-6 text-center text-zinc-600 text-xs font-mono px-2">
-                // No sessions logged.
+          {/* Recents Section */}
+          <div>
+            {pinnedConversations.length > 0 && (
+              <div className="px-2 py-1 text-[10px] uppercase font-bold tracking-wider opacity-60" style={{ color: 'var(--text-muted)' }}>
+                Recent
               </div>
-            ) : (
-              filteredConversations.map(conv => {
-                const isActive = conv.id === activeId;
-                const isEditingThis = editingId === conv.id;
-
-                return (
-                  <div
+            )}
+            <div className="space-y-1">
+              {regularConversations.length === 0 && pinnedConversations.length === 0 ? (
+                <div className="p-4 text-center text-xs opacity-60" style={{ color: 'var(--text-muted)' }}>
+                  No chats match &ldquo;{searchQuery}&rdquo;
+                </div>
+              ) : (
+                regularConversations.map(conv => (
+                  <ConversationItem
                     key={conv.id}
-                    onClick={() => onSelectConversation(conv.id)}
-                    className={`group relative flex items-center justify-between pl-3 pr-2 py-1.5 text-xs font-mono transition-all cursor-pointer ${
-                      isActive
-                        ? 'border-l-2 border-[#00FF66] bg-[#111111]/90 text-white font-medium shadow-xs'
-                        : 'border-l-2 border-transparent text-zinc-400 opacity-60 hover:opacity-100 hover:text-white hover:bg-[#111111]/40'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
-                      {isEditingThis ? (
-                        <input
-                          type="text"
-                          value={editTitle}
-                          onChange={e => setEditTitle(e.target.value)}
-                          onClick={e => e.stopPropagation()}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') saveRename(conv.id, e);
-                            if (e.key === 'Escape') cancelRename(e as any);
-                          }}
-                          autoFocus
-                          className="w-full bg-[#050505] border border-[#00FF66] px-1.5 py-0.5 text-xs text-white focus:outline-none font-mono"
-                        />
-                      ) : (
-                        <span className="truncate text-[12px]">{conv.title}</span>
-                      )}
-                    </div>
+                    conversation={conv}
+                    isActive={conv.id === activeId}
+                    onSelect={() => onSelectConversation(conv.id)}
+                    onDelete={() => onDeleteConversation(conv.id)}
+                    onTogglePin={() => onTogglePin(conv.id)}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        </div>
 
-                    {/* Action Icons on hover / active */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      {isEditingThis ? (
-                        <>
-                          <button
-                            onClick={e => saveRename(conv.id, e)}
-                            className="p-1 text-[#00FF66] hover:bg-zinc-800 rounded"
-                            title="Save"
-                          >
-                            <Check className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={cancelRename}
-                            className="p-1 text-zinc-400 hover:bg-zinc-800 rounded"
-                            title="Cancel"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </>
-                      ) : (
-                        <div className={`flex items-center gap-1 ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
-                          <button
-                            onClick={e => startRename(conv, e)}
-                            className="p-1 text-zinc-400 hover:text-[#00FF66] hover:bg-black/50 rounded cursor-pointer"
-                            title="Rename session"
-                          >
-                            <Edit3 className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={e => {
-                              e.stopPropagation();
-                              if (confirm(`Purge "${conv.title}"?`)) {
-                                onDeleteConversation(conv.id);
-                              }
-                            }}
-                            className="p-1 text-zinc-400 hover:text-rose-400 hover:bg-black/50 rounded cursor-pointer"
-                            title="Purge session"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
+        {/* Bottom Profile & Actions */}
+        <div
+          className="p-3 border-t space-y-2 shrink-0"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-subtle)',
+          }}
+        >
+          {/* User Account Bar */}
+          <div
+            className="flex items-center justify-between p-2 rounded-lg border transition-colors cursor-pointer"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              borderColor: 'var(--border-subtle)',
+            }}
+            onClick={onOpenAccount}
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center font-mono text-[11px] font-bold shrink-0"
+                style={{
+                  backgroundColor: 'var(--accent)',
+                  color: 'var(--accent-text)',
+                }}
+              >
+                {currentProfile?.avatar ? (
+                  <img
+                    src={currentProfile.avatar}
+                    alt={currentProfile.name}
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : currentProfile?.name ? (
+                  currentProfile.name.slice(0, 2).toUpperCase()
+                ) : (
+                  <User className="w-3.5 h-3.5" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+                  {currentProfile?.name || 'Account & Profile'}
+                </div>
+                <div className="text-[10px] truncate opacity-70" style={{ color: 'var(--text-muted)' }}>
+                  {currentProfile?.email || 'Click to customize profile'}
+                </div>
+              </div>
+            </div>
+
+            {currentProfile && onLogoutProfile && (
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation();
+                  onLogoutProfile();
+                }}
+                className="p-1 rounded opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                style={{ color: 'var(--text-muted)' }}
+                title="Sign out of local profile"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
             )}
           </div>
 
-          {/* Footer / User & System Status Area */}
-          <div className="mt-auto pt-4 border-t border-[#1a1a1a] space-y-2">
-            <div
+          {/* Quick Controls (Settings & Theme) */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
               onClick={onOpenSettings}
-              className="flex items-center gap-3 p-2.5 bg-[#111] border border-[#1a1a1a] rounded-sm cursor-pointer hover:bg-[#1a1a1a] hover:border-[#333] transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 py-2 px-2.5 rounded-md border text-xs font-semibold transition-all cursor-pointer opacity-90 hover:opacity-100"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-subtle)',
+                color: 'var(--text-secondary)',
+              }}
             >
-              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#00FF66] to-cyan-500 shrink-0 shadow-sm"></div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-white tracking-wide">Alpha Tester</p>
-                <p className="text-[10px] opacity-40 italic font-mono text-zinc-400">Tier 01 Access</p>
-              </div>
-              <Settings className="w-3.5 h-3.5 text-zinc-500 hover:text-[#00FF66] transition-colors" />
-            </div>
+              <Sliders className="w-3.5 h-3.5" />
+              <span>Settings</span>
+            </button>
 
-            <div className="flex items-center justify-between px-1 text-[10px] font-mono text-zinc-500">
-              <button
-                onClick={onToggleTheme}
-                className="flex items-center gap-1 hover:text-[#00FF66] transition-colors cursor-pointer"
-              >
-                {settings.theme === 'dark' ? (
-                  <Moon className="w-3 h-3 text-[#00FF66]" />
-                ) : (
-                  <Sun className="w-3 h-3 text-amber-400" />
-                )}
-                <span className="uppercase tracking-widest">{settings.theme} Mode</span>
-              </button>
-              <span className="text-[#00FF66] opacity-70">LATENT: ACTIVE</span>
-            </div>
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="flex items-center gap-1.5 py-2 px-2.5 rounded-md border text-xs font-semibold transition-all cursor-pointer opacity-90 hover:opacity-100"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-subtle)',
+                color: 'var(--accent)',
+              }}
+              title={`Active Theme: ${activeTheme.name}`}
+            >
+              <Palette className="w-3.5 h-3.5" />
+              <span className="text-[11px] hidden sm:inline">{activeTheme.name.split(' ')[0]}</span>
+            </button>
           </div>
         </div>
       </aside>
     </>
+  );
+};
+
+interface ConversationItemProps {
+  conversation: Conversation;
+  isActive: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+  onTogglePin: () => void;
+}
+
+const ConversationItem: React.FC<ConversationItemProps> = ({
+  conversation,
+  isActive,
+  onSelect,
+  onDelete,
+  onTogglePin,
+}) => {
+  return (
+    <div
+      onClick={onSelect}
+      className={`group relative flex items-center justify-between p-2.5 rounded-lg border text-xs cursor-pointer transition-all ${
+        isActive ? 'shadow-xs' : 'opacity-80 hover:opacity-100'
+      }`}
+      style={{
+        backgroundColor: isActive ? 'var(--bg-active)' : 'transparent',
+        borderColor: isActive ? 'var(--accent)' : 'transparent',
+        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+      }}
+    >
+      <div className="flex items-center gap-2 min-w-0 pr-2">
+        <MessageSquare
+          className="w-3.5 h-3.5 shrink-0"
+          style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}
+        />
+        <span className="truncate font-medium">{conversation.title}</span>
+      </div>
+
+      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            onTogglePin();
+          }}
+          className="p-1 rounded opacity-70 hover:opacity-100 cursor-pointer"
+          style={{ color: 'var(--text-muted)' }}
+          title={conversation.pinned ? 'Unpin thread' : 'Pin thread'}
+        >
+          <Pin className={`w-3 h-3 ${conversation.pinned ? 'fill-current' : ''}`} />
+        </button>
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="p-1 rounded opacity-70 hover:opacity-100 hover:text-rose-400 cursor-pointer"
+          style={{ color: 'var(--text-muted)' }}
+          title="Delete thread"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
   );
 };

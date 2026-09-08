@@ -22,34 +22,52 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language = 'text', value }
   const displayLang = language?.replace(/^language-/, '') || 'code';
 
   return (
-    <div className="my-4 bg-[#0c0c0c] border border-[#1a1a1a] rounded-sm font-mono text-sm relative overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 bg-[#080808] text-zinc-400 border-b border-[#1a1a1a] select-none text-xs">
+    <div
+      className="my-4 rounded-lg font-mono text-sm relative overflow-hidden border shadow-sm"
+      style={{
+        backgroundColor: 'var(--code-bg, var(--bg-card))',
+        borderColor: 'var(--border-base)',
+      }}
+    >
+      <div
+        className="flex items-center justify-between px-4 py-2 border-b select-none text-xs"
+        style={{
+          backgroundColor: 'var(--bg-surface)',
+          borderColor: 'var(--border-subtle)',
+          color: 'var(--text-secondary)',
+        }}
+      >
         <div className="flex items-center gap-2">
-          <Terminal className="w-3.5 h-3.5 text-[#00FF66]" />
-          <span className="font-bold uppercase tracking-widest text-[10px] text-[#00FF66]">
-            SYNTAX: {displayLang.toUpperCase()}
+          <Terminal className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+          <span className="font-bold uppercase tracking-widest text-[10px]" style={{ color: 'var(--accent)' }}>
+            {displayLang.toUpperCase()}
           </span>
         </div>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1.5 py-1 px-2.5 bg-[#111] border border-[#222] hover:border-[#00FF66] text-zinc-300 hover:text-[#00FF66] text-[10px] uppercase tracking-wider transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 py-1 px-2.5 rounded border text-[10px] uppercase tracking-wider transition-all cursor-pointer opacity-90 hover:opacity-100"
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            borderColor: 'var(--border-subtle)',
+            color: copied ? 'var(--accent)' : 'var(--text-primary)',
+          }}
           title="Copy code to clipboard"
           aria-label="Copy code"
         >
           {copied ? (
             <>
-              <Check className="w-3 h-3 text-[#00FF66]" />
-              <span className="text-[#00FF66] font-bold">COPIED</span>
+              <Check className="w-3 h-3" style={{ color: 'var(--accent)' }} />
+              <span className="font-bold">COPIED</span>
             </>
           ) : (
             <>
               <Copy className="w-3 h-3" />
-              <span>COPY SCHEMA</span>
+              <span>COPY</span>
             </>
           )}
         </button>
       </div>
-      <div className="p-4 sm:p-5 overflow-x-auto text-[13px] leading-relaxed text-[#e0e0e0]">
+      <div className="p-4 sm:p-5 overflow-x-auto text-[13px] leading-relaxed text-zinc-100 font-mono">
         <pre className="m-0 p-0 font-mono">
           <code>{value}</code>
         </pre>

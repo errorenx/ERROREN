@@ -1,14 +1,15 @@
-import { Conversation, AppSettings, ChatMessage } from '../types';
+import { Conversation, AppSettings, UserProfile } from '../types';
+import { DEFAULT_THEME_ID, loadSavedThemeId, THEMES } from './theme';
 
-const STORAGE_CONVERSATIONS_KEY = 'erroren_conversations_v1';
-const STORAGE_CURRENT_ID_KEY = 'erroren_active_chat_id_v1';
-const STORAGE_SETTINGS_KEY = 'erroren_settings_v1';
+const STORAGE_CONVERSATIONS_KEY = 'erroren_conversations_v2';
+const STORAGE_CURRENT_ID_KEY = 'erroren_active_chat_id_v2';
+const STORAGE_SETTINGS_KEY = 'erroren_settings_v2';
+const STORAGE_USER_PROFILE_KEY = 'erroren_user_profile_v2';
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  theme: 'dark',
+  themeId: loadSavedThemeId() || DEFAULT_THEME_ID,
+  themeMode: THEMES[loadSavedThemeId() || DEFAULT_THEME_ID]?.mode || 'dark',
   systemPrompt: '',
-  speechVoiceName: '',
-  speechRate: 1,
   streamResponses: true,
 };
 
@@ -24,10 +25,10 @@ export const INITIAL_CONVERSATION: Conversation = {
       content:
         `Hello! I am **ERROREN**, your intelligent AI assistant.\n\n` +
         `How can I assist you today? Feel free to ask me anything in **English**, **Roman Urdu** (jaise: *"kya haal hai?"*), or **Urdu** (اردو).\n\n` +
-        `- 💻 **Code & Technical**: Debug errors, write code, explain algorithms\n` +
-        `- ✍️ **Writing & Brainstorming**: Essays, emails, creative ideas\n` +
-        `- 🖼️ **Image Understanding**: Attach photos or screenshots to analyze\n` +
-        `- 🎙️ **Voice**: Talk directly using the microphone button`,
+        `- 💻 **Code & Architecture**: Debug errors, write algorithms, review code\n` +
+        `- ✍️ **Writing & Analysis**: Draft emails, summarize articles, brainstorm strategies\n` +
+        `- 🎨 **10 Color Themes**: Select from 5 dark & 5 light themes in Settings\n` +
+        `- 💾 **Instant Save**: Save your profile and chat history effortlessly with zero verification`,
       timestamp: Date.now(),
     },
   ],
@@ -76,7 +77,15 @@ export function loadSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(STORAGE_SETTINGS_KEY);
     if (!raw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    const themeId = parsed.themeId && THEMES[parsed.themeId] ? parsed.themeId : DEFAULT_SETTINGS.themeId;
+    const themeMode = THEMES[themeId]?.mode || 'dark';
+    return {
+      ...DEFAULT_SETTINGS,
+      ...parsed,
+      themeId,
+      themeMode,
+    };
   } catch {
     return DEFAULT_SETTINGS;
   }
@@ -87,6 +96,28 @@ export function saveSettings(settings: AppSettings): void {
     localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(settings));
   } catch (err) {
     console.error('Failed to save settings', err);
+  }
+}
+
+export function loadLocalProfile(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_USER_PROFILE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function saveLocalProfile(profile: UserProfile | null): void {
+  try {
+    if (profile) {
+      localStorage.setItem(STORAGE_USER_PROFILE_KEY, JSON.stringify(profile));
+    } else {
+      localStorage.removeItem(STORAGE_USER_PROFILE_KEY);
+    }
+  } catch (err) {
+    console.error('Failed to save local profile', err);
   }
 }
 
