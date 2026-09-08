@@ -1,0 +1,10 @@
+{
+  "name": "ERROREN",
+  "description": "A fast and powerful AI assistant inspired by ChatGPT, featuring conversational memory, multi-modal analysis, and code synthesis.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
