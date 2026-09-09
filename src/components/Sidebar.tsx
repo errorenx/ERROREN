@@ -15,7 +15,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { Conversation, UserProfile } from '../types';
-import { ThemeId, THEMES } from '../utils/theme';
+import { ColorId, COLOR_PALETTES, DEFAULT_COLOR_ID, DEFAULT_THEME_MODE, ThemeId, ThemeMode, THEMES } from '../utils/theme';
 
 interface SidebarProps {
   conversations: Conversation[];
@@ -30,8 +30,12 @@ interface SidebarProps {
   currentProfile: UserProfile | null;
   onOpenAccount: () => void;
   onLogoutProfile?: () => void;
-  currentThemeId: ThemeId;
-  onSelectTheme: (themeId: ThemeId) => void;
+  currentThemeMode?: ThemeMode;
+  currentColorId?: ColorId;
+  onSelectThemeMode?: (mode: ThemeMode) => void;
+  onSelectColorId?: (colorId: ColorId) => void;
+  currentThemeId?: ThemeId;
+  onSelectTheme?: (themeId: ThemeId) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -47,12 +51,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentProfile,
   onOpenAccount,
   onLogoutProfile,
+  currentThemeMode = DEFAULT_THEME_MODE,
+  currentColorId = DEFAULT_COLOR_ID,
+  onSelectThemeMode,
+  onSelectColorId,
   currentThemeId,
   onSelectTheme,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
-  const activeTheme = THEMES[currentThemeId];
+  const activeColor = COLOR_PALETTES[currentColorId] || COLOR_PALETTES[DEFAULT_COLOR_ID];
+  const activeTheme = currentThemeId && THEMES[currentThemeId] ? THEMES[currentThemeId] : THEMES[`${currentColorId}-${currentThemeMode}`] || THEMES['cyan-dark'];
 
   // Filter conversations by query
   const filteredConversations = conversations.filter(c =>
@@ -64,10 +73,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const regularConversations = filteredConversations.filter(c => !c.pinned);
 
   const toggleThemeMode = () => {
-    if (activeTheme.mode === 'dark') {
-      onSelectTheme('clean-white');
-    } else {
-      onSelectTheme('midnight-blue');
+    const nextMode: ThemeMode = currentThemeMode === 'dark' ? 'light' : 'dark';
+    if (onSelectThemeMode) {
+      onSelectThemeMode(nextMode);
+    } else if (onSelectTheme) {
+      onSelectTheme(`${currentColorId}-${nextMode}`);
     }
   };
 
@@ -122,9 +132,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={toggleThemeMode}
               className="p-1.5 rounded opacity-75 hover:opacity-100 transition-opacity cursor-pointer"
               style={{ color: 'var(--text-secondary)' }}
-              title={activeTheme.mode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              title={currentThemeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
-              {activeTheme.mode === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              {currentThemeMode === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
             </button>
             <button
               onClick={onToggleSidebar}
@@ -328,10 +338,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 borderColor: 'var(--border-subtle)',
                 color: 'var(--accent)',
               }}
-              title={`Active Theme: ${activeTheme.name}`}
+              title={`Active Color: ${activeColor.name} (${currentThemeMode === 'dark' ? 'Dark' : 'Light'})`}
             >
-              <Palette className="w-3.5 h-3.5" />
-              <span className="text-[11px] hidden sm:inline">{activeTheme.name.split(' ')[0]}</span>
+              <div
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: 'var(--accent)' }}
+              />
+              <span className="text-[11px] hidden sm:inline">{activeColor.name.split(' ')[0]}</span>
             </button>
           </div>
         </div>

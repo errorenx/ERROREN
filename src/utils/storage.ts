@@ -1,5 +1,13 @@
 import { Conversation, AppSettings, UserProfile } from '../types';
-import { DEFAULT_THEME_ID, loadSavedThemeId, THEMES } from './theme';
+import {
+  DEFAULT_COLOR_ID,
+  DEFAULT_THEME_ID,
+  DEFAULT_THEME_MODE,
+  loadSavedColorId,
+  loadSavedThemeId,
+  loadSavedThemeMode,
+  COLOR_PALETTES,
+} from './theme';
 
 const STORAGE_CONVERSATIONS_KEY = 'erroren_conversations_v2';
 const STORAGE_CURRENT_ID_KEY = 'erroren_active_chat_id_v2';
@@ -8,7 +16,8 @@ const STORAGE_USER_PROFILE_KEY = 'erroren_user_profile_v2';
 
 export const DEFAULT_SETTINGS: AppSettings = {
   themeId: loadSavedThemeId() || DEFAULT_THEME_ID,
-  themeMode: THEMES[loadSavedThemeId() || DEFAULT_THEME_ID]?.mode || 'dark',
+  themeMode: loadSavedThemeMode() || DEFAULT_THEME_MODE,
+  colorId: loadSavedColorId() || DEFAULT_COLOR_ID,
   systemPrompt: '',
   streamResponses: true,
 };
@@ -78,13 +87,25 @@ export function loadSettings(): AppSettings {
     const raw = localStorage.getItem(STORAGE_SETTINGS_KEY);
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw);
-    const themeId = parsed.themeId && THEMES[parsed.themeId] ? parsed.themeId : DEFAULT_SETTINGS.themeId;
-    const themeMode = THEMES[themeId]?.mode || 'dark';
+    
+    // Determine theme mode ('dark' or 'light')
+    const themeMode = parsed.themeMode === 'light' || parsed.themeMode === 'dark' 
+      ? parsed.themeMode 
+      : DEFAULT_SETTINGS.themeMode;
+
+    // Determine color ID (1 of 10)
+    const colorId = parsed.colorId && COLOR_PALETTES[parsed.colorId]
+      ? parsed.colorId
+      : DEFAULT_SETTINGS.colorId;
+
+    const themeId = `${colorId}-${themeMode}`;
+
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
-      themeId,
       themeMode,
+      colorId,
+      themeId,
     };
   } catch {
     return DEFAULT_SETTINGS;

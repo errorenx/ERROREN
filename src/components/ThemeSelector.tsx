@@ -1,252 +1,285 @@
-import React, { useState } from 'react';
-import { Check, Moon, Sun, Palette, Sparkles } from 'lucide-react';
+import React from 'react';
+import { Check, Moon, Sun, Palette, Sparkles, ShieldCheck } from 'lucide-react';
 import {
-  ThemeId,
+  ColorId,
+  COLOR_LIST,
+  COLOR_PALETTES,
+  DEFAULT_COLOR_ID,
+  DEFAULT_THEME_MODE,
   ThemeMode,
-  THEMES,
-  DARK_THEMES,
-  LIGHT_THEMES,
-  DEFAULT_THEME_ID,
 } from '../utils/theme';
 
 interface ThemeSelectorProps {
-  currentThemeId: ThemeId;
-  onSelectTheme: (themeId: ThemeId) => void;
-  onToggleMode?: () => void;
+  currentMode: ThemeMode;
+  currentColorId: ColorId;
+  onSelectMode: (mode: ThemeMode) => void;
+  onSelectColor: (colorId: ColorId) => void;
+  // Optional backward compatibility
+  currentThemeId?: string;
+  onSelectTheme?: (themeId: string) => void;
 }
 
 export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
-  currentThemeId,
+  currentMode = DEFAULT_THEME_MODE,
+  currentColorId = DEFAULT_COLOR_ID,
+  onSelectMode,
+  onSelectColor,
   onSelectTheme,
 }) => {
-  const currentTheme = THEMES[currentThemeId] || THEMES[DEFAULT_THEME_ID];
-  // Active tab defaults to the mode of the currently selected theme
-  const [activeTab, setActiveTab] = useState<ThemeMode>(currentTheme.mode);
+  const activeColor = COLOR_PALETTES[currentColorId] || COLOR_PALETTES[DEFAULT_COLOR_ID];
 
-  const handleTabChange = (mode: ThemeMode) => {
-    setActiveTab(mode);
-  };
-
-  const handleQuickToggle = () => {
-    const nextMode: ThemeMode = currentTheme.mode === 'dark' ? 'light' : 'dark';
-    setActiveTab(nextMode);
-    if (nextMode === 'dark') {
-      onSelectTheme('midnight-blue');
-    } else {
-      onSelectTheme('clean-white');
+  const handleModeChange = (mode: ThemeMode) => {
+    onSelectMode(mode);
+    if (onSelectTheme) {
+      onSelectTheme(`${currentColorId}-${mode}`);
     }
   };
 
-  const displayedThemes = activeTab === 'dark' ? DARK_THEMES : LIGHT_THEMES;
+  const handleColorChange = (colorId: ColorId) => {
+    onSelectColor(colorId);
+    if (onSelectTheme) {
+      onSelectTheme(`${colorId}-${currentMode}`);
+    }
+  };
 
   return (
-    <div className="space-y-5">
-      {/* Top Controls: Quick Mode Toggle & Distinct Tab Switcher */}
-      <div
-        className="p-3.5 rounded-xl border flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs"
-        style={{
-          backgroundColor: 'var(--bg-card)',
-          borderColor: 'var(--border-base)',
-        }}
-      >
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border"
+    <div className="space-y-6">
+      {/* SECTION 1: APPEARANCE MODE (DARK MODE vs LIGHT MODE) */}
+      <div>
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center gap-2">
+            <div
+              className="p-1.5 rounded-md"
+              style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent)' }}
+            >
+              {currentMode === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            </div>
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
+                1. Appearance Mode
+              </h3>
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                Independent Dark and Light base architecture
+              </p>
+            </div>
+          </div>
+          <span
+            className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase"
             style={{
               backgroundColor: 'var(--accent-subtle)',
-              borderColor: 'var(--border-subtle)',
               color: 'var(--accent)',
             }}
           >
-            {activeTab === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5 text-amber-500" />}
-          </div>
-          <div>
-            <div className="font-bold text-xs uppercase tracking-wider flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <span>Theme Category</span>
-              <span
-                className="text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase tracking-wider"
-                style={{
-                  backgroundColor: 'var(--accent)',
-                  color: 'var(--accent-text)',
-                }}
-              >
-                {currentTheme.name}
-              </span>
-            </div>
-            <div className="text-[11px] opacity-70" style={{ color: 'var(--text-muted)' }}>
-              Choose from 5 dark or 5 light hand-crafted color palettes
-            </div>
-          </div>
+            Active: {currentMode === 'dark' ? 'Dark Mode' : 'Light Mode'}
+          </span>
         </div>
 
-        {/* Distinct Segmented Control Tabs */}
-        <div
-          className="flex items-center p-1 rounded-lg border w-full sm:w-auto justify-center"
-          style={{
-            backgroundColor: 'var(--bg-base)',
-            borderColor: 'var(--border-subtle)',
-          }}
-        >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Dark Mode Card */}
           <button
             type="button"
-            onClick={() => handleTabChange('dark')}
-            className={`flex items-center justify-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-              activeTab === 'dark' ? 'shadow-md' : 'opacity-60 hover:opacity-100'
+            onClick={() => handleModeChange('dark')}
+            className={`p-4 rounded-xl border text-left transition-all relative cursor-pointer group ${
+              currentMode === 'dark'
+                ? 'ring-2 shadow-lg'
+                : 'opacity-75 hover:opacity-100'
             }`}
             style={{
-              backgroundColor: activeTab === 'dark' ? 'var(--accent)' : 'transparent',
-              color: activeTab === 'dark' ? 'var(--accent-text)' : 'var(--text-secondary)',
+              backgroundColor: '#0c1424',
+              borderColor: currentMode === 'dark' ? 'var(--accent)' : '#1e293b',
+              color: '#f8fafc',
             }}
           >
-            <Moon className="w-3.5 h-3.5" />
-            <span>Dark Themes (5)</span>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#152238] border border-[#233554] flex items-center justify-center text-cyan-400">
+                  <Moon className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wider text-white">Dark Mode</div>
+                  <div className="text-[10px] text-slate-400">Deep cyber midnight surfaces</div>
+                </div>
+              </div>
+              {currentMode === 'dark' && (
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                  style={{ backgroundColor: 'var(--accent)', color: 'var(--accent-text)' }}
+                >
+                  <Check className="w-3 h-3" />
+                </div>
+              )}
+            </div>
+
+            {/* Mini preview illustration */}
+            <div className="p-2.5 rounded-lg bg-[#070d1a] border border-[#182642] flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeColor.dark.accent }} />
+              <div className="h-2 flex-1 rounded bg-[#162544]" />
+              <div
+                className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold"
+                style={{ backgroundColor: activeColor.dark.accent, color: activeColor.dark.accentText }}
+              >
+                AI
+              </div>
+            </div>
           </button>
 
+          {/* Light Mode Card */}
           <button
             type="button"
-            onClick={() => handleTabChange('light')}
-            className={`flex items-center justify-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-              activeTab === 'light' ? 'shadow-md' : 'opacity-60 hover:opacity-100'
+            onClick={() => handleModeChange('light')}
+            className={`p-4 rounded-xl border text-left transition-all relative cursor-pointer group ${
+              currentMode === 'light'
+                ? 'ring-2 shadow-lg'
+                : 'opacity-75 hover:opacity-100'
             }`}
             style={{
-              backgroundColor: activeTab === 'light' ? 'var(--accent)' : 'transparent',
-              color: activeTab === 'light' ? 'var(--accent-text)' : 'var(--text-secondary)',
+              backgroundColor: '#ffffff',
+              borderColor: currentMode === 'light' ? 'var(--accent)' : '#e2e8f0',
+              color: '#0f172a',
             }}
           >
-            <Sun className="w-3.5 h-3.5" />
-            <span>Light Themes (5)</span>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#f1f5f9] border border-[#cbd5e1] flex items-center justify-center text-amber-500">
+                  <Sun className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-900">Light Mode</div>
+                  <div className="text-[10px] text-slate-500">Clean high-contrast daylight surfaces</div>
+                </div>
+              </div>
+              {currentMode === 'light' && (
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                  style={{ backgroundColor: 'var(--accent)', color: 'var(--accent-text)' }}
+                >
+                  <Check className="w-3 h-3" />
+                </div>
+              )}
+            </div>
+
+            {/* Mini preview illustration */}
+            <div className="p-2.5 rounded-lg bg-[#f8fafc] border border-[#e2e8f0] flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeColor.light.accent }} />
+              <div className="h-2 flex-1 rounded bg-[#e2e8f0]" />
+              <div
+                className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold"
+                style={{ backgroundColor: activeColor.light.accent, color: activeColor.light.accentText }}
+              >
+                AI
+              </div>
+            </div>
           </button>
         </div>
       </div>
 
-      {/* Themes Grid */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
-            {activeTab === 'dark' ? (
-              <>
-                <Moon className="w-4 h-4 text-indigo-400" />
-                <span>Selected: Dark Mode Color Palettes</span>
-              </>
-            ) : (
-              <>
-                <Sun className="w-4 h-4 text-amber-500" />
-                <span>Selected: Light Mode Color Palettes</span>
-              </>
-            )}
+      {/* SECTION 2: 10 SEPARATE ACCENT COLORS */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div
+              className="p-1.5 rounded-md"
+              style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent)' }}
+            >
+              <Palette className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
+                2. 10 Separate Colors
+              </h3>
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                Select any color to apply across Dark or Light Mode
+              </p>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={handleQuickToggle}
-            className="text-[11px] font-mono uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-opacity opacity-80 hover:opacity-100"
-            style={{ color: 'var(--accent)' }}
+          <span
+            className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase"
+            style={{
+              backgroundColor: 'var(--accent-subtle)',
+              color: 'var(--accent)',
+            }}
           >
-            <Sparkles className="w-3 h-3" />
-            <span>Toggle {activeTab === 'dark' ? 'Light' : 'Dark'}</span>
-          </button>
+            {activeColor.name}
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {displayedThemes.map(theme => {
-            const isSelected = theme.id === currentThemeId;
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+          {COLOR_LIST.map((color, index) => {
+            const isSelected = currentColorId === color.id;
+            const accentHex = currentMode === 'dark' ? color.dark.accent : color.light.accent;
+
             return (
-              <div
-                key={theme.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => onSelectTheme(theme.id)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onSelectTheme(theme.id);
-                  }
-                }}
-                className={`relative p-3.5 rounded-xl border text-left cursor-pointer transition-all duration-200 outline-none select-none group ${
-                  isSelected ? 'scale-[1.02] shadow-xl' : 'hover:scale-[1.01]'
+              <button
+                key={color.id}
+                type="button"
+                onClick={() => handleColorChange(color.id)}
+                className={`p-3 rounded-xl border flex flex-col items-center text-center gap-2 transition-all cursor-pointer relative group ${
+                  isSelected
+                    ? 'ring-2 scale-[1.02] shadow-md'
+                    : 'opacity-85 hover:opacity-100 hover:scale-[1.01]'
                 }`}
                 style={{
-                  backgroundColor: theme.preview.bg,
-                  borderColor: isSelected ? theme.preview.accent : theme.preview.border,
-                  boxShadow: isSelected ? `0 0 16px ${theme.preview.accent}30` : 'none',
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: isSelected ? accentHex : 'var(--border-subtle)',
                 }}
               >
-                {/* Header with Title and Active Badge */}
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div>
-                    <div className="font-bold text-xs flex items-center gap-2" style={{ color: theme.preview.text }}>
-                      <span>{theme.name}</span>
-                      {isSelected && (
-                        <span
-                          className="text-[9px] px-2 py-0.5 rounded font-mono font-bold tracking-wider"
-                          style={{
-                            backgroundColor: theme.preview.accent,
-                            color: theme.mode === 'dark' ? '#021020' : '#ffffff',
-                          }}
-                        >
-                          ACTIVE
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-[11px] mt-1 opacity-75 leading-tight" style={{ color: theme.preview.text }}>
-                      {theme.description}
-                    </div>
-                  </div>
-
-                  {/* Selection Radio / Checkmark Indicator */}
-                  <div
-                    className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-transform group-hover:scale-110"
-                    style={{
-                      borderColor: isSelected ? theme.preview.accent : theme.preview.border,
-                      backgroundColor: isSelected ? theme.preview.accent : 'transparent',
-                    }}
-                  >
-                    {isSelected && (
-                      <Check
-                        className="w-3 h-3 font-bold"
-                        style={{ color: theme.mode === 'dark' ? '#021020' : '#ffffff' }}
-                      />
-                    )}
-                  </div>
-                </div>
-
-                {/* Color Swatch Previews */}
-                <div
-                  className="mt-3 pt-2.5 border-t flex items-center gap-2"
-                  style={{ borderColor: `${theme.preview.border}80` }}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <div
-                      className="w-4 h-4 rounded-full border border-black/20 shrink-0 shadow-2xs"
-                      title="Background"
-                      style={{ backgroundColor: theme.preview.bg }}
-                    />
-                    <div
-                      className="w-4 h-4 rounded-full border border-black/20 shrink-0 shadow-2xs"
-                      title="Surface / Card"
-                      style={{ backgroundColor: theme.preview.card }}
-                    />
-                    <div
-                      className="w-4 h-4 rounded-full border border-black/20 shrink-0 shadow-2xs"
-                      title="Accent"
-                      style={{ backgroundColor: theme.preview.accent }}
-                    />
-                    <div
-                      className="w-4 h-4 rounded-full border border-black/20 shrink-0 shadow-2xs"
-                      title="Border"
-                      style={{ backgroundColor: theme.preview.border }}
-                    />
-                  </div>
-
-                  <span
-                    className="text-[10px] font-mono ml-auto font-bold uppercase tracking-wider"
-                    style={{ color: theme.preview.accent }}
-                  >
-                    {theme.preview.accent}
+                {/* Number & Check Indicator */}
+                <div className="w-full flex items-center justify-between px-0.5">
+                  <span className="text-[9px] font-mono opacity-50" style={{ color: 'var(--text-muted)' }}>
+                    #{index + 1}
                   </span>
+                  {isSelected && (
+                    <span
+                      className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] shadow-xs"
+                      style={{ backgroundColor: accentHex }}
+                    >
+                      <Check className="w-2.5 h-2.5" />
+                    </span>
+                  )}
                 </div>
-              </div>
+
+                {/* Color Swatch Circle with Glow */}
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm"
+                  style={{
+                    backgroundColor: color.preview,
+                    boxShadow: isSelected ? `0 0 16px ${color.preview}88` : `0 0 8px ${color.preview}44`,
+                  }}
+                />
+
+                {/* Color Name */}
+                <div className="w-full">
+                  <div className="text-[11px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+                    {color.name}
+                  </div>
+                  <div className="text-[9px] font-mono mt-0.5 opacity-60 truncate" style={{ color: 'var(--text-muted)' }}>
+                    {color.preview}
+                  </div>
+                </div>
+              </button>
             );
           })}
+        </div>
+      </div>
+
+      {/* Synchronized Status Banner */}
+      <div
+        className="p-3 rounded-lg border flex items-center justify-between gap-3 text-xs"
+        style={{
+          backgroundColor: 'var(--bg-base)',
+          borderColor: 'var(--border-subtle)',
+          color: 'var(--text-secondary)',
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+          <span>
+            Active Setup: <strong style={{ color: 'var(--text-primary)' }}>{currentMode === 'dark' ? 'Dark Mode' : 'Light Mode'}</strong> with <strong style={{ color: 'var(--accent)' }}>{activeColor.name}</strong>
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 text-[10px] font-mono opacity-70">
+          <ShieldCheck className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+          <span>100% Active</span>
         </div>
       </div>
     </div>

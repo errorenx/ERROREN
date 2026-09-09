@@ -1,23 +1,400 @@
 export type ThemeMode = 'dark' | 'light';
 
-export type ThemeId =
-  // 5 Dark Themes
-  | 'midnight-blue'
-  | 'dark-purple'
-  | 'emerald-dark'
-  | 'crimson-dark'
-  | 'graphite-black'
-  // 5 Light Themes
-  | 'clean-white'
-  | 'soft-blue'
-  | 'lavender'
-  | 'mint'
-  | 'warm-cream';
+export type ColorId =
+  | 'cyan'     // 1. Electric Cyan
+  | 'emerald'  // 2. Emerald Green
+  | 'purple'   // 3. Neon Violet
+  | 'crimson'  // 4. Crimson Rose
+  | 'amber'    // 5. Solar Amber
+  | 'blue'     // 6. Royal Cobalt
+  | 'orange'   // 7. Sunset Orange
+  | 'lime'     // 8. Cyber Lime
+  | 'pink'     // 9. Fuchsia Pink
+  | 'teal';    // 10. Obsidian Teal
+
+export interface ColorDefinition {
+  id: ColorId;
+  name: string;
+  preview: string; // The vibrant hex code representing this color
+  description: string;
+  dark: {
+    accent: string;
+    accentHover: string;
+    accentSubtle: string;
+    accentText: string;
+    borderFocus: string;
+    glow: string;
+  };
+  light: {
+    accent: string;
+    accentHover: string;
+    accentSubtle: string;
+    accentText: string;
+    borderFocus: string;
+    glow: string;
+  };
+}
+
+export const COLOR_PALETTES: Record<ColorId, ColorDefinition> = {
+  cyan: {
+    id: 'cyan',
+    name: 'Electric Cyan',
+    preview: '#00d2ff',
+    description: 'Vivid cyberpunk cyan glow',
+    dark: {
+      accent: '#00d2ff',
+      accentHover: '#38bdf8',
+      accentSubtle: 'rgba(0, 210, 255, 0.15)',
+      accentText: '#021020',
+      borderFocus: '#00d2ff',
+      glow: 'rgba(0, 210, 255, 0.45)',
+    },
+    light: {
+      accent: '#0284c7',
+      accentHover: '#0369a1',
+      accentSubtle: 'rgba(2, 132, 199, 0.12)',
+      accentText: '#ffffff',
+      borderFocus: '#0284c7',
+      glow: 'rgba(2, 132, 199, 0.35)',
+    },
+  },
+  emerald: {
+    id: 'emerald',
+    name: 'Emerald Green',
+    preview: '#10b981',
+    description: 'Luminous matrix neon emerald',
+    dark: {
+      accent: '#00ff88',
+      accentHover: '#34d399',
+      accentSubtle: 'rgba(0, 255, 136, 0.15)',
+      accentText: '#022012',
+      borderFocus: '#00ff88',
+      glow: 'rgba(0, 255, 136, 0.45)',
+    },
+    light: {
+      accent: '#059669',
+      accentHover: '#047857',
+      accentSubtle: 'rgba(5, 150, 105, 0.12)',
+      accentText: '#ffffff',
+      borderFocus: '#059669',
+      glow: 'rgba(5, 150, 105, 0.35)',
+    },
+  },
+  purple: {
+    id: 'purple',
+    name: 'Neon Violet',
+    preview: '#a855f7',
+    description: 'Enigmatic deep neon amethyst',
+    dark: {
+      accent: '#c084fc',
+      accentHover: '#d8b4fe',
+      accentSubtle: 'rgba(192, 132, 252, 0.16)',
+      accentText: '#16072b',
+      borderFocus: '#c084fc',
+      glow: 'rgba(192, 132, 252, 0.45)',
+    },
+    light: {
+      accent: '#7c3aed',
+      accentHover: '#6d28d9',
+      accentSubtle: 'rgba(124, 58, 237, 0.12)',
+      accentText: '#ffffff',
+      borderFocus: '#7c3aed',
+      glow: 'rgba(124, 58, 237, 0.35)',
+    },
+  },
+  crimson: {
+    id: 'crimson',
+    name: 'Crimson Rose',
+    preview: '#f43f5e',
+    description: 'Intense high-energy crimson scarlet',
+    dark: {
+      accent: '#ff385c',
+      accentHover: '#fb7185',
+      accentSubtle: 'rgba(255, 56, 92, 0.16)',
+      accentText: '#ffffff',
+      borderFocus: '#ff385c',
+      glow: 'rgba(255, 56, 92, 0.45)',
+    },
+    light: {
+      accent: '#e11d48',
+      accentHover: '#be123c',
+      accentSubtle: 'rgba(225, 29, 72, 0.12)',
+      accentText: '#ffffff',
+      borderFocus: '#e11d48',
+      glow: 'rgba(225, 29, 72, 0.35)',
+    },
+  },
+  amber: {
+    id: 'amber',
+    name: 'Solar Amber',
+    preview: '#f59e0b',
+    description: 'Radiant golden cyber amber',
+    dark: {
+      accent: '#fbbf24',
+      accentHover: '#fcd34d',
+      accentSubtle: 'rgba(251, 191, 36, 0.16)',
+      accentText: '#241500',
+      borderFocus: '#fbbf24',
+      glow: 'rgba(251, 191, 36, 0.45)',
+    },
+    light: {
+      accent: '#d97706',
+      accentHover: '#b45309',
+      accentSubtle: 'rgba(217, 119, 6, 0.12)',
+      accentText: '#ffffff',
+      borderFocus: '#d97706',
+      glow: 'rgba(217, 119, 6, 0.35)',
+    },
+  },
+  blue: {
+    id: 'blue',
+    name: 'Royal Cobalt',
+    preview: '#3b82f6',
+    description: 'Majestic sapphire deep ocean blue',
+    dark: {
+      accent: '#60a5fa',
+      accentHover: '#93c5fd',
+      accentSubtle: 'rgba(96, 165, 250, 0.16)',
+      accentText: '#081a36',
+      borderFocus: '#60a5fa',
+      glow: 'rgba(96, 165, 250, 0.45)',
+    },
+    light: {
+      accent: '#2563eb',
+      accentHover: '#1d4ed8',
+      accentSubtle: 'rgba(37, 99, 235, 0.12)',
+      accentText: '#ffffff',
+      borderFocus: '#2563eb',
+      glow: 'rgba(37, 99, 235, 0.35)',
+    },
+  },
+  orange: {
+    id: 'orange',
+    name: 'Sunset Orange',
+    preview: '#f97316',
+    description: 'Fiery neon twilight orange',
+    dark: {
+      accent: '#fb923c',
+      accentHover: '#fdba74',
+      accentSubtle: 'rgba(251, 146, 60, 0.16)',
+      accentText: '#2e1104',
+      borderFocus: '#fb923c',
+      glow: 'rgba(251, 146, 60, 0.45)',
+    },
+    light: {
+      accent: '#ea580c',
+      accentHover: '#c2410c',
+      accentSubtle: 'rgba(234, 88, 12, 0.12)',
+      accentText: '#ffffff',
+      borderFocus: '#ea580c',
+      glow: 'rgba(234, 88, 12, 0.35)',
+    },
+  },
+  lime: {
+    id: 'lime',
+    name: 'Cyber Lime',
+    preview: '#84cc16',
+    description: 'High-visibility fluorescent neon lime',
+    dark: {
+      accent: '#a3e635',
+      accentHover: '#bef264',
+      accentSubtle: 'rgba(163, 230, 53, 0.16)',
+      accentText: '#192e03',
+      borderFocus: '#a3e635',
+      glow: 'rgba(163, 230, 53, 0.45)',
+    },
+    light: {
+      accent: '#65a30d',
+      accentHover: '#4d7c0f',
+      accentSubtle: 'rgba(101, 163, 13, 0.12)',
+      accentText: '#ffffff',
+      borderFocus: '#65a30d',
+      glow: 'rgba(101, 163, 13, 0.35)',
+    },
+  },
+  pink: {
+    id: 'pink',
+    name: 'Fuchsia Pink',
+    preview: '#ec4899',
+    description: 'Electrifying neon fuchsia synthwave',
+    dark: {
+      accent: '#f472b6',
+      accentHover: '#f9a8d4',
+      accentSubtle: 'rgba(244, 114, 182, 0.16)',
+      accentText: '#2e071b',
+      borderFocus: '#f472b6',
+      glow: 'rgba(244, 114, 182, 0.45)',
+    },
+    light: {
+      accent: '#db2777',
+      accentHover: '#be185d',
+      accentSubtle: 'rgba(219, 39, 119, 0.12)',
+      accentText: '#ffffff',
+      borderFocus: '#db2777',
+      glow: 'rgba(219, 39, 119, 0.35)',
+    },
+  },
+  teal: {
+    id: 'teal',
+    name: 'Obsidian Teal',
+    preview: '#14b8a6',
+    description: 'Futuristic crystalline seafoam turquoise',
+    dark: {
+      accent: '#2dd4bf',
+      accentHover: '#5eead4',
+      accentSubtle: 'rgba(45, 212, 191, 0.16)',
+      accentText: '#042421',
+      borderFocus: '#2dd4bf',
+      glow: 'rgba(45, 212, 191, 0.45)',
+    },
+    light: {
+      accent: '#0d9488',
+      accentHover: '#0f766e',
+      accentSubtle: 'rgba(13, 148, 136, 0.12)',
+      accentText: '#ffffff',
+      borderFocus: '#0d9488',
+      glow: 'rgba(13, 148, 136, 0.35)',
+    },
+  },
+};
+
+export const COLOR_LIST: ColorDefinition[] = Object.values(COLOR_PALETTES);
+
+export const DARK_BASE_VARS: Record<string, string> = {
+  '--bg-base': '#070d1a',
+  '--bg-surface': '#0d172e',
+  '--bg-card': '#122040',
+  '--bg-card-hover': '#182b54',
+  '--bg-active': '#1e3568',
+  '--border-base': '#1e325c',
+  '--border-subtle': '#142342',
+  '--text-primary': '#f0f6fc',
+  '--text-secondary': '#9bb0d1',
+  '--text-muted': '#5b7298',
+  '--code-bg': '#0a1324',
+  '--scrollbar-thumb': '#1e325c',
+};
+
+export const LIGHT_BASE_VARS: Record<string, string> = {
+  '--bg-base': '#f6f8fc',
+  '--bg-surface': '#ffffff',
+  '--bg-card': '#edf2fa',
+  '--bg-card-hover': '#e2eaf6',
+  '--bg-active': '#d4e2f5',
+  '--border-base': '#c5d5ec',
+  '--border-subtle': '#dce6f5',
+  '--text-primary': '#0a1628',
+  '--text-secondary': '#334766',
+  '--text-muted': '#687e9d',
+  '--code-bg': '#edf2fa',
+  '--scrollbar-thumb': '#c5d5ec',
+};
+
+export const DEFAULT_THEME_MODE: ThemeMode = 'dark';
+export const DEFAULT_COLOR_ID: ColorId = 'cyan';
+
+const STORAGE_MODE_KEY = 'erroren_theme_mode_v3';
+const STORAGE_COLOR_KEY = 'erroren_color_id_v3';
+const LEGACY_STORAGE_THEME_KEY = 'erroren_color_theme_v2';
+
+export function loadSavedThemeMode(): ThemeMode {
+  try {
+    const saved = localStorage.getItem(STORAGE_MODE_KEY);
+    if (saved === 'dark' || saved === 'light') return saved;
+    // Check legacy
+    const legacy = localStorage.getItem(LEGACY_STORAGE_THEME_KEY);
+    if (legacy && (legacy.includes('white') || legacy.includes('soft') || legacy.includes('lavender') || legacy.includes('mint') || legacy.includes('cream'))) {
+      return 'light';
+    }
+  } catch {}
+  return DEFAULT_THEME_MODE;
+}
+
+export function saveThemeMode(mode: ThemeMode): void {
+  try {
+    localStorage.setItem(STORAGE_MODE_KEY, mode);
+  } catch (e) {
+    console.error('Failed to save theme mode', e);
+  }
+}
+
+export function loadSavedColorId(): ColorId {
+  try {
+    const saved = localStorage.getItem(STORAGE_COLOR_KEY) as ColorId;
+    if (saved && COLOR_PALETTES[saved]) return saved;
+    // Check legacy
+    const legacy = localStorage.getItem(LEGACY_STORAGE_THEME_KEY);
+    if (legacy) {
+      if (legacy.includes('purple') || legacy.includes('lavender')) return 'purple';
+      if (legacy.includes('emerald') || legacy.includes('mint')) return 'emerald';
+      if (legacy.includes('crimson')) return 'crimson';
+      if (legacy.includes('cream')) return 'amber';
+      if (legacy.includes('blue')) return 'blue';
+    }
+  } catch {}
+  return DEFAULT_COLOR_ID;
+}
+
+export function saveColorId(colorId: ColorId): void {
+  try {
+    localStorage.setItem(STORAGE_COLOR_KEY, colorId);
+  } catch (e) {
+    console.error('Failed to save color ID', e);
+  }
+}
+
+/**
+ * Apply the selected Theme Mode ('dark' | 'light') and Color Palette (1 of 10) across the entire application.
+ */
+export function applyTheme(mode: ThemeMode, colorId: ColorId): void {
+  const safeMode: ThemeMode = mode === 'light' ? 'light' : 'dark';
+  const colorDef = COLOR_PALETTES[colorId] || COLOR_PALETTES[DEFAULT_COLOR_ID];
+  const baseVars = safeMode === 'dark' ? DARK_BASE_VARS : LIGHT_BASE_VARS;
+  const colorVars = safeMode === 'dark' ? colorDef.dark : colorDef.light;
+
+  const root = document.documentElement;
+
+  // Set standard HTML data attributes and CSS classes
+  root.setAttribute('data-theme-mode', safeMode);
+  root.setAttribute('data-theme-color', colorDef.id);
+  root.setAttribute('data-theme', `${colorDef.id}-${safeMode}`);
+  
+  if (safeMode === 'dark') {
+    root.classList.add('dark');
+    root.classList.remove('light');
+  } else {
+    root.classList.remove('dark');
+    root.classList.add('light');
+  }
+
+  // Inject mode base surface variables
+  Object.entries(baseVars).forEach(([key, val]) => {
+    root.style.setProperty(key, val);
+  });
+
+  // Inject color accent variables
+  root.style.setProperty('--accent', colorVars.accent);
+  root.style.setProperty('--accent-hover', colorVars.accentHover);
+  root.style.setProperty('--accent-subtle', colorVars.accentSubtle);
+  root.style.setProperty('--accent-text', colorVars.accentText);
+  root.style.setProperty('--border-focus', colorVars.borderFocus);
+  root.style.setProperty('--accent-glow', colorVars.glow);
+
+  // Directly adjust body styles for zero-delay repaints
+  document.body.style.backgroundColor = baseVars['--bg-base'];
+  document.body.style.color = baseVars['--text-primary'];
+}
+
+// ----------------------------------------------------------------------
+// BACKWARD COMPATIBILITY LAYER FOR EXISTING COMPONENTS
+// ----------------------------------------------------------------------
+export type ThemeId = string;
 
 export interface ThemeDefinition {
-  id: ThemeId;
+  id: string;
   name: string;
   mode: ThemeMode;
+  colorId: ColorId;
   description: string;
   preview: {
     bg: string;
@@ -30,393 +407,69 @@ export interface ThemeDefinition {
   cssVars: Record<string, string>;
 }
 
-export const THEMES: Record<ThemeId, ThemeDefinition> = {
-  // --- 5 DARK THEMES ---
-  'midnight-blue': {
-    id: 'midnight-blue',
-    name: 'Midnight Blue',
-    mode: 'dark',
-    description: 'Deep celestial navy with electric cyan highlights',
-    preview: {
-      bg: '#070d1a',
-      surface: '#0d172e',
-      card: '#122040',
-      border: '#1e325c',
-      accent: '#00d2ff',
-      text: '#f0f6fc',
-    },
-    cssVars: {
-      '--bg-base': '#070d1a',
-      '--bg-surface': '#0d172e',
-      '--bg-card': '#122040',
-      '--bg-card-hover': '#182b54',
-      '--bg-active': '#1e3568',
-      '--border-base': '#1e325c',
-      '--border-subtle': '#142342',
-      '--border-focus': '#00d2ff',
-      '--text-primary': '#f0f6fc',
-      '--text-secondary': '#9bb0d1',
-      '--text-muted': '#5b7298',
-      '--accent': '#00d2ff',
-      '--accent-hover': '#38bdf8',
-      '--accent-subtle': 'rgba(0, 210, 255, 0.12)',
-      '--accent-text': '#021020',
-      '--code-bg': '#0a1324',
-      '--scrollbar-thumb': '#1e325c',
-    },
-  },
-  'dark-purple': {
-    id: 'dark-purple',
-    name: 'Dark Purple',
-    mode: 'dark',
-    description: 'Enigmatic obsidian violet with luminous neon amethyst',
-    preview: {
-      bg: '#0c0614',
-      surface: '#140924',
-      card: '#1e0f34',
-      border: '#351c58',
-      accent: '#c084fc',
-      text: '#faf5ff',
-    },
-    cssVars: {
-      '--bg-base': '#0c0614',
-      '--bg-surface': '#140924',
-      '--bg-card': '#1e0f34',
-      '--bg-card-hover': '#291446',
-      '--bg-active': '#341959',
-      '--border-base': '#351c58',
-      '--border-subtle': '#25123d',
-      '--border-focus': '#c084fc',
-      '--text-primary': '#faf5ff',
-      '--text-secondary': '#d8b4fe',
-      '--text-muted': '#8a67b5',
-      '--accent': '#c084fc',
-      '--accent-hover': '#d8b4fe',
-      '--accent-subtle': 'rgba(192, 132, 252, 0.14)',
-      '--accent-text': '#16072b',
-      '--code-bg': '#10081a',
-      '--scrollbar-thumb': '#351c58',
-    },
-  },
-  'emerald-dark': {
-    id: 'emerald-dark',
-    name: 'Emerald Dark',
-    mode: 'dark',
-    description: 'Deep nocturnal forest with vivid matrix jade',
-    preview: {
-      bg: '#040f09',
-      surface: '#081a10',
-      card: '#0d281a',
-      border: '#16422b',
-      accent: '#00ff88',
-      text: '#ecfdf5',
-    },
-    cssVars: {
-      '--bg-base': '#040f09',
-      '--bg-surface': '#081a10',
-      '--bg-card': '#0d281a',
-      '--bg-card-hover': '#123623',
-      '--bg-active': '#17442d',
-      '--border-base': '#16422b',
-      '--border-subtle': '#0e2b1c',
-      '--border-focus': '#00ff88',
-      '--text-primary': '#ecfdf5',
-      '--text-secondary': '#6ee7b7',
-      '--text-muted': '#3b785d',
-      '--accent': '#00ff88',
-      '--accent-hover': '#34d399',
-      '--accent-subtle': 'rgba(0, 255, 136, 0.12)',
-      '--accent-text': '#02180d',
-      '--code-bg': '#06140c',
-      '--scrollbar-thumb': '#16422b',
-    },
-  },
-  'crimson-dark': {
-    id: 'crimson-dark',
-    name: 'Crimson Dark',
-    mode: 'dark',
-    description: 'Charcoal wine with radiant cyber scarlet pulse',
-    preview: {
-      bg: '#120507',
-      surface: '#1c080c',
-      card: '#290c13',
-      border: '#4a1723',
-      accent: '#ff3366',
-      text: '#fff1f2',
-    },
-    cssVars: {
-      '--bg-base': '#120507',
-      '--bg-surface': '#1c080c',
-      '--bg-card': '#290c13',
-      '--bg-card-hover': '#38101a',
-      '--bg-active': '#471421',
-      '--border-base': '#4a1723',
-      '--border-subtle': '#300f17',
-      '--border-focus': '#ff3366',
-      '--text-primary': '#fff1f2',
-      '--text-secondary': '#fda4af',
-      '--text-muted': '#9f5160',
-      '--accent': '#ff3366',
-      '--accent-hover': '#fb7185',
-      '--accent-subtle': 'rgba(255, 51, 102, 0.14)',
-      '--accent-text': '#220309',
-      '--code-bg': '#170609',
-      '--scrollbar-thumb': '#4a1723',
-    },
-  },
-  'graphite-black': {
-    id: 'graphite-black',
-    name: 'Graphite Black',
-    mode: 'dark',
-    description: 'Pure monochromatic carbon with refined emerald accent',
-    preview: {
-      bg: '#09090b',
-      surface: '#111114',
-      card: '#18181c',
-      border: '#2e2e38',
-      accent: '#22c55e',
-      text: '#fafafa',
-    },
-    cssVars: {
-      '--bg-base': '#09090b',
-      '--bg-surface': '#111114',
-      '--bg-card': '#18181c',
-      '--bg-card-hover': '#222228',
-      '--bg-active': '#2a2a32',
-      '--border-base': '#2e2e38',
-      '--border-subtle': '#1e1e24',
-      '--border-focus': '#22c55e',
-      '--text-primary': '#fafafa',
-      '--text-secondary': '#a1a1aa',
-      '--text-muted': '#71717a',
-      '--accent': '#22c55e',
-      '--accent-hover': '#4ade80',
-      '--accent-subtle': 'rgba(34, 197, 94, 0.12)',
-      '--accent-text': '#050505',
-      '--code-bg': '#0e0e11',
-      '--scrollbar-thumb': '#2e2e38',
-    },
-  },
+export const DEFAULT_THEME_ID = 'midnight-blue';
 
-  // --- 5 LIGHT THEMES ---
-  'clean-white': {
-    id: 'clean-white',
-    name: 'Clean White',
-    mode: 'light',
-    description: 'Minimalist alpine studio with obsidian contrast',
-    preview: {
-      bg: '#f8fafc',
-      surface: '#ffffff',
-      card: '#ffffff',
-      border: '#cbd5e1',
-      accent: '#0f172a',
-      text: '#0f172a',
-    },
-    cssVars: {
-      '--bg-base': '#f8fafc',
-      '--bg-surface': '#ffffff',
-      '--bg-card': '#ffffff',
-      '--bg-card-hover': '#f1f5f9',
-      '--bg-active': '#e2e8f0',
-      '--border-base': '#cbd5e1',
-      '--border-subtle': '#e2e8f0',
-      '--border-focus': '#0f172a',
-      '--text-primary': '#0f172a',
-      '--text-secondary': '#475569',
-      '--text-muted': '#64748b',
-      '--accent': '#0f172a',
-      '--accent-hover': '#334155',
-      '--accent-subtle': 'rgba(15, 23, 42, 0.08)',
-      '--accent-text': '#ffffff',
-      '--code-bg': '#0f172a',
-      '--scrollbar-thumb': '#cbd5e1',
-    },
-  },
-  'soft-blue': {
-    id: 'soft-blue',
-    name: 'Soft Blue',
-    mode: 'light',
-    description: 'Crisp morning cerulean with royal sapphire highlights',
-    preview: {
-      bg: '#f0f6fc',
-      surface: '#e6eff9',
-      card: '#ffffff',
-      border: '#b8d2ee',
-      accent: '#2563eb',
-      text: '#0f2942',
-    },
-    cssVars: {
-      '--bg-base': '#f0f6fc',
-      '--bg-surface': '#e6eff9',
-      '--bg-card': '#ffffff',
-      '--bg-card-hover': '#dbe8f6',
-      '--bg-active': '#cde0f4',
-      '--border-base': '#b8d2ee',
-      '--border-subtle': '#d0e1f4',
-      '--border-focus': '#2563eb',
-      '--text-primary': '#0f2942',
-      '--text-secondary': '#234a70',
-      '--text-muted': '#547699',
-      '--accent': '#2563eb',
-      '--accent-hover': '#1d4ed8',
-      '--accent-subtle': 'rgba(37, 99, 235, 0.1)',
-      '--accent-text': '#ffffff',
-      '--code-bg': '#0d2238',
-      '--scrollbar-thumb': '#b8d2ee',
-    },
-  },
-  'lavender': {
-    id: 'lavender',
-    name: 'Lavender',
-    mode: 'light',
-    description: 'Delicate pastel lilac with regal amethyst accents',
-    preview: {
-      bg: '#faf7fd',
-      surface: '#f3eafa',
-      card: '#ffffff',
-      border: '#d0bae8',
-      accent: '#7c3aed',
-      text: '#241442',
-    },
-    cssVars: {
-      '--bg-base': '#faf7fd',
-      '--bg-surface': '#f3eafa',
-      '--bg-card': '#ffffff',
-      '--bg-card-hover': '#ece0f7',
-      '--bg-active': '#dfcef2',
-      '--border-base': '#d0bae8',
-      '--border-subtle': '#e4d5f4',
-      '--border-focus': '#7c3aed',
-      '--text-primary': '#241442',
-      '--text-secondary': '#4d2c86',
-      '--text-muted': '#7c5ca8',
-      '--accent': '#7c3aed',
-      '--accent-hover': '#6d28d9',
-      '--accent-subtle': 'rgba(124, 58, 237, 0.1)',
-      '--accent-text': '#ffffff',
-      '--code-bg': '#1e1136',
-      '--scrollbar-thumb': '#d0bae8',
-    },
-  },
-  'mint': {
-    id: 'mint',
-    name: 'Mint',
-    mode: 'light',
-    description: 'Invigorating botanical sage with vibrant clean jade',
-    preview: {
-      bg: '#f0fdf4',
-      surface: '#e3f7ea',
-      card: '#ffffff',
-      border: '#a8dfba',
-      accent: '#059669',
-      text: '#064e3b',
-    },
-    cssVars: {
-      '--bg-base': '#f0fdf4',
-      '--bg-surface': '#e3f7ea',
-      '--bg-card': '#ffffff',
-      '--bg-card-hover': '#d4f2e0',
-      '--bg-active': '#c3ebd3',
-      '--border-base': '#a8dfba',
-      '--border-subtle': '#c9ebd6',
-      '--border-focus': '#059669',
-      '--text-primary': '#064e3b',
-      '--text-secondary': '#047857',
-      '--text-muted': '#369a7a',
-      '--accent': '#059669',
-      '--accent-hover': '#047857',
-      '--accent-subtle': 'rgba(5, 150, 105, 0.1)',
-      '--accent-text': '#ffffff',
-      '--code-bg': '#043629',
-      '--scrollbar-thumb': '#a8dfba',
-    },
-  },
-  'warm-cream': {
-    id: 'warm-cream',
-    name: 'Warm Cream',
-    mode: 'light',
-    description: 'Ivory alabaster linen with rich golden amber',
-    preview: {
-      bg: '#fbf8f2',
-      surface: '#f3ecde',
-      card: '#ffffff',
-      border: '#cbbaa0',
-      accent: '#b45309',
-      text: '#3f2608',
-    },
-    cssVars: {
-      '--bg-base': '#fbf8f2',
-      '--bg-surface': '#f3ecde',
-      '--bg-card': '#ffffff',
-      '--bg-card-hover': '#ebe1cf',
-      '--bg-active': '#dfd2bc',
-      '--border-base': '#cbbaa0',
-      '--border-subtle': '#dfd3c1',
-      '--border-focus': '#b45309',
-      '--text-primary': '#3f2608',
-      '--text-secondary': '#734612',
-      '--text-muted': '#93642c',
-      '--accent': '#b45309',
-      '--accent-hover': '#92400e',
-      '--accent-subtle': 'rgba(180, 83, 9, 0.1)',
-      '--accent-text': '#ffffff',
-      '--code-bg': '#2b1b06',
-      '--scrollbar-thumb': '#cbbaa0',
-    },
-  },
-};
+// Generate synthetic legacy THEMES map so older imports continue working flawlessly
+export const THEMES: Record<string, ThemeDefinition> = {};
+['dark', 'light'].forEach(m => {
+  COLOR_LIST.forEach(c => {
+    const id = `${c.id}-${m}`;
+    const base = m === 'dark' ? DARK_BASE_VARS : LIGHT_BASE_VARS;
+    const colorSty = m === 'dark' ? c.dark : c.light;
+    THEMES[id] = {
+      id,
+      name: `${c.name} (${m === 'dark' ? 'Dark' : 'Light'})`,
+      mode: m as ThemeMode,
+      colorId: c.id,
+      description: c.description,
+      preview: {
+        bg: base['--bg-base'],
+        surface: base['--bg-surface'],
+        card: base['--bg-card'],
+        border: base['--border-base'],
+        accent: colorSty.accent,
+        text: base['--text-primary'],
+      },
+      cssVars: {
+        ...base,
+        '--accent': colorSty.accent,
+        '--accent-hover': colorSty.accentHover,
+        '--accent-subtle': colorSty.accentSubtle,
+        '--accent-text': colorSty.accentText,
+        '--border-focus': colorSty.borderFocus,
+      },
+    };
+  });
+});
+// Add aliases for old legacy IDs
+THEMES['midnight-blue'] = THEMES['cyan-dark'];
+THEMES['dark-purple'] = THEMES['purple-dark'];
+THEMES['emerald-dark'] = THEMES['emerald-dark'];
+THEMES['crimson-dark'] = THEMES['crimson-dark'];
+THEMES['graphite-black'] = THEMES['blue-dark'];
+THEMES['clean-white'] = THEMES['cyan-light'];
+THEMES['soft-blue'] = THEMES['blue-light'];
+THEMES['lavender'] = THEMES['purple-light'];
+THEMES['mint'] = THEMES['emerald-light'];
+THEMES['warm-cream'] = THEMES['amber-light'];
 
 export const THEME_LIST: ThemeDefinition[] = Object.values(THEMES);
-
 export const DARK_THEMES = THEME_LIST.filter(t => t.mode === 'dark');
 export const LIGHT_THEMES = THEME_LIST.filter(t => t.mode === 'light');
 
-export const DEFAULT_THEME_ID: ThemeId = 'midnight-blue';
-
-const STORAGE_THEME_KEY = 'erroren_color_theme_v2';
-
-export function loadSavedThemeId(): ThemeId {
-  try {
-    const saved = localStorage.getItem(STORAGE_THEME_KEY) as ThemeId;
-    if (saved && THEMES[saved]) {
-      return saved;
-    }
-  } catch {
-    // Fallback to default
-  }
-  return DEFAULT_THEME_ID;
+export function loadSavedThemeId(): string {
+  const mode = loadSavedThemeMode();
+  const color = loadSavedColorId();
+  return `${color}-${mode}`;
 }
 
-export function saveThemeId(themeId: ThemeId): void {
-  try {
-    localStorage.setItem(STORAGE_THEME_KEY, themeId);
-  } catch (err) {
-    console.error('Failed to save theme in localStorage', err);
+export function saveThemeId(themeId: string): void {
+  // If string like "cyan-dark", extract mode and color
+  const parts = themeId.split('-');
+  if (parts.length >= 2) {
+    const color = parts[0] as ColorId;
+    const mode = parts[1] as ThemeMode;
+    if (COLOR_PALETTES[color]) saveColorId(color);
+    if (mode === 'dark' || mode === 'light') saveThemeMode(mode);
   }
-}
-
-/**
- * Applies the given theme CSS variables and data attributes to the document.
- */
-export function applyTheme(themeId: ThemeId): void {
-  const theme = THEMES[themeId] || THEMES[DEFAULT_THEME_ID];
-  const root = document.documentElement;
-
-  // Set data-theme attribute
-  root.setAttribute('data-theme', theme.id);
-  root.setAttribute('data-mode', theme.mode);
-
-  // Toggle standard Tailwind dark class
-  if (theme.mode === 'dark') {
-    root.classList.add('dark');
-    root.classList.remove('light');
-  } else {
-    root.classList.remove('dark');
-    root.classList.add('light');
-  }
-
-  // Inject CSS variables
-  Object.entries(theme.cssVars).forEach(([key, val]) => {
-    root.style.setProperty(key, val);
-  });
 }

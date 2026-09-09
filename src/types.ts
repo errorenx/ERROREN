@@ -1,4 +1,4 @@
-import { ThemeId, ThemeMode } from './utils/theme';
+import { ColorId, ThemeId, ThemeMode } from './utils/theme';
 
 export interface MessageAttachment {
   name: string;
@@ -30,6 +30,7 @@ export interface Conversation {
 export interface AppSettings {
   themeId: ThemeId;
   themeMode: ThemeMode;
+  colorId: ColorId;
   systemPrompt: string;
   streamResponses: boolean;
   clientApiKey?: string;

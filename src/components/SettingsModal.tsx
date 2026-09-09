@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Sliders, Trash2, Download, Sparkles, Command, Palette } from 'lucide-react';
 import { AppSettings, Conversation } from '../types';
 import { ThemeSelector } from './ThemeSelector';
-import { ThemeId, applyTheme, THEMES } from '../utils/theme';
+import { ColorId, ThemeId, ThemeMode, applyTheme, THEMES } from '../utils/theme';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -30,16 +30,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSelectTheme = (themeId: ThemeId) => {
-    const selectedMode = THEMES[themeId]?.mode || 'dark';
+  const handleSelectMode = (mode: ThemeMode) => {
+    const currentColor = localSettings.colorId || 'cyan';
     const updated = {
       ...localSettings,
-      themeId,
-      themeMode: selectedMode,
+      themeMode: mode,
+      themeId: `${currentColor}-${mode}`,
     };
     setLocalSettings(updated);
-    // Apply live immediately for seamless feedback
-    applyTheme(themeId);
+    applyTheme(mode, currentColor);
+    onSaveSettings(updated);
+  };
+
+  const handleSelectColor = (colorId: ColorId) => {
+    const currentMode = localSettings.themeMode || 'dark';
+    const updated = {
+      ...localSettings,
+      colorId,
+      themeId: `${colorId}-${currentMode}`,
+    };
+    setLocalSettings(updated);
+    applyTheme(currentMode, colorId);
     onSaveSettings(updated);
   };
 
@@ -174,16 +185,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div>
               <div className="mb-4">
                 <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
-                  Color Theme Selection
+                  Appearance &amp; Color System
                 </h3>
                 <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  Switch between 5 curated dark themes and 5 elegant light themes. Instantly applied across all buttons, sidebars, cards, and chats.
+                  Independent Dark Mode &amp; Light Mode controls paired with 10 separate signature accent colors. Fully active across the entire application.
                 </p>
               </div>
 
               <ThemeSelector
-                currentThemeId={localSettings.themeId}
-                onSelectTheme={handleSelectTheme}
+                currentMode={localSettings.themeMode || 'dark'}
+                currentColorId={localSettings.colorId || 'cyan'}
+                onSelectMode={handleSelectMode}
+                onSelectColor={handleSelectColor}
               />
             </div>
           )}

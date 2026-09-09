@@ -28,7 +28,19 @@ import {
   deleteConversationFromCloud,
   loadCloudConversations,
 } from './lib/firebase';
-import { applyTheme, saveThemeId, ThemeId, THEMES, DEFAULT_THEME_ID } from './utils/theme';
+import {
+  applyTheme,
+  saveThemeMode,
+  saveColorId,
+  saveThemeId,
+  ColorId,
+  ThemeMode,
+  ThemeId,
+  THEMES,
+  DEFAULT_THEME_ID,
+  DEFAULT_THEME_MODE,
+  DEFAULT_COLOR_ID,
+} from './utils/theme';
 
 export default function App() {
   const [conversations, setConversations] = useState<Conversation[]>(() => loadConversations());
@@ -43,12 +55,15 @@ export default function App() {
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Initialize theme on mount and whenever themeId changes
+  // Initialize theme on mount and whenever themeMode or colorId changes
   useEffect(() => {
-    const currentTheme = settings.themeId || DEFAULT_THEME_ID;
-    applyTheme(currentTheme);
-    saveThemeId(currentTheme);
-  }, [settings.themeId]);
+    const mode = settings.themeMode || DEFAULT_THEME_MODE;
+    const color = settings.colorId || DEFAULT_COLOR_ID;
+    applyTheme(mode, color);
+    saveThemeMode(mode);
+    saveColorId(color);
+    saveThemeId(`${color}-${mode}`);
+  }, [settings.themeMode, settings.colorId]);
 
   // Sync settings
   useEffect(() => {
@@ -146,15 +161,46 @@ export default function App() {
       messages: [],
     };
 
+  const handleSelectThemeMode = (mode: ThemeMode) => {
+    const currentColor = settings.colorId || DEFAULT_COLOR_ID;
+    const updated: AppSettings = {
+      ...settings,
+      themeMode: mode,
+      themeId: `${currentColor}-${mode}`,
+    };
+    setSettings(updated);
+    applyTheme(mode, currentColor);
+    saveThemeMode(mode);
+    saveThemeId(`${currentColor}-${mode}`);
+  };
+
+  const handleSelectColorId = (colorId: ColorId) => {
+    const currentMode = settings.themeMode || DEFAULT_THEME_MODE;
+    const updated: AppSettings = {
+      ...settings,
+      colorId,
+      themeId: `${colorId}-${currentMode}`,
+    };
+    setSettings(updated);
+    applyTheme(currentMode, colorId);
+    saveColorId(colorId);
+    saveThemeId(`${colorId}-${currentMode}`);
+  };
+
   const handleSelectTheme = (themeId: ThemeId) => {
-    const mode = THEMES[themeId]?.mode || 'dark';
+    const parts = themeId.split('-');
+    const color = (parts[0] as ColorId) || DEFAULT_COLOR_ID;
+    const mode = (parts[1] as ThemeMode) || DEFAULT_THEME_MODE;
     const updated: AppSettings = {
       ...settings,
       themeId,
       themeMode: mode,
+      colorId: color,
     };
     setSettings(updated);
-    applyTheme(themeId);
+    applyTheme(mode, color);
+    saveThemeMode(mode);
+    saveColorId(color);
     saveThemeId(themeId);
   };
 
@@ -626,6 +672,10 @@ export default function App() {
         currentProfile={localProfile}
         onOpenAccount={() => setIsAccountOpen(true)}
         onLogoutProfile={handleLogoutProfile}
+        currentThemeMode={settings.themeMode}
+        currentColorId={settings.colorId}
+        onSelectThemeMode={handleSelectThemeMode}
+        onSelectColorId={handleSelectColorId}
         currentThemeId={settings.themeId}
         onSelectTheme={handleSelectTheme}
       />
@@ -646,6 +696,10 @@ export default function App() {
           onOpenSettings={() => setIsSettingsOpen(true)}
           currentProfile={localProfile}
           onOpenAccount={() => setIsAccountOpen(true)}
+          currentThemeMode={settings.themeMode}
+          currentColorId={settings.colorId}
+          onSelectThemeMode={handleSelectThemeMode}
+          onSelectColorId={handleSelectColorId}
           currentThemeId={settings.themeId}
           onSelectTheme={handleSelectTheme}
         />
