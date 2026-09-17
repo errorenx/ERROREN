@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sliders, Sparkles, Palette, User, Share2, Copy, Download, Check, Sun, Moon, LogOut } from 'lucide-react';
+import { X, Sliders, Sparkles, Palette, User, Share2, Copy, Download, Check, Sun, Moon, LogOut, Database, ShieldCheck } from 'lucide-react';
 import { AppSettings, Conversation, UserProfile } from '../types';
 import { ThemeSelector } from './ThemeSelector';
 import { ColorId, ThemeMode, applyTheme } from '../utils/theme';
+import { isSupabaseConfigured, getSupabase } from '../lib/supabase';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -27,9 +28,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onLogoutProfile,
 }) => {
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
-  const [activeTab, setActiveTab] = useState<'appearance' | 'profile' | 'share' | 'system'>('appearance');
+  const [activeTab, setActiveTab] = useState<'appearance' | 'profile' | 'share' | 'system' | 'backend'>('appearance');
   const [copiedShare, setCopiedShare] = useState(false);
   const [copiedTranscript, setCopiedTranscript] = useState(false);
+  const [supabaseUrl, setSupabaseUrl] = useState(() => localStorage.getItem('ERROREN_SUPABASE_URL') || '');
+  const [supabaseKey, setSupabaseKey] = useState(() => localStorage.getItem('ERROREN_SUPABASE_ANON_KEY') || '');
+  const [supabaseStatus, setSupabaseStatus] = useState<string | null>(null);
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -123,22 +127,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             borderColor: 'var(--border-subtle)',
           }}
         >
-          <div className="flex items-center gap-2.5">
-            <div
-              className="w-7 h-7 rounded-md flex items-center justify-center"
-              style={{
-                backgroundColor: 'var(--accent-subtle)',
-                color: 'var(--accent)',
+          <div className="flex items-center gap-3">
+            <img
+              src="./logo.png"
+              alt="ERROREN"
+              className="w-8 h-8 rounded-lg object-contain shrink-0 shadow-xs"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
               }}
-            >
-              <Sliders className="w-4 h-4" />
-            </div>
+            />
             <div>
-              <h2 className="text-xs font-bold uppercase tracking-wider">
-                Preferences &amp; Settings
+              <h2 className="text-xs font-bold uppercase tracking-wider font-mono">
+                ERROREN // Preferences &amp; Settings
               </h2>
               <p className="text-[11px] opacity-70" style={{ color: 'var(--text-muted)' }}>
-                Customize color theme, dark/light mode, profile, and share options
+                Customize color theme, dark/light mode, profile, and Supabase backend
               </p>
             </div>
           </div>
@@ -187,6 +190,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <User className="w-3.5 h-3.5" />
             <span>Profile Setting</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('backend')}
+            className={`pb-2.5 font-bold uppercase tracking-wider text-[11px] border-b-2 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'backend' ? 'opacity-100' : 'opacity-60 hover:opacity-90'
+            }`}
+            style={{
+              borderColor: activeTab === 'backend' ? 'var(--accent)' : 'transparent',
+              color: activeTab === 'backend' ? 'var(--text-primary)' : 'var(--text-muted)',
+            }}
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>Backend (Supabase)</span>
           </button>
 
           <button
@@ -418,6 +436,128 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'backend' && (
+            <div className="space-y-4 font-mono">
+              <div
+                className="p-4 rounded-xl border"
+                style={{
+                  backgroundColor: 'var(--bg-base)',
+                  borderColor: 'var(--border-subtle)',
+                }}
+              >
+                <div className="flex items-center gap-2.5 mb-2">
+                  <div
+                    className="p-2 rounded-lg border"
+                    style={{
+                      backgroundColor: 'var(--accent-subtle)',
+                      borderColor: 'var(--border-subtle)',
+                      color: 'var(--accent)',
+                    }}
+                  >
+                    <Database className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-xs" style={{ color: 'var(--text-primary)' }}>
+                      Supabase Cloud Backend
+                    </div>
+                    <div className="text-[11px] opacity-70" style={{ color: 'var(--text-muted)' }}>
+                      High-performance PostgreSQL, auth sessions, and real-time state synchronization
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className="p-3 rounded-lg border text-xs space-y-2 mb-4"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    borderColor: 'var(--border-subtle)',
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] opacity-80" style={{ color: 'var(--text-muted)' }}>
+                      Engine Status:
+                    </span>
+                    <span
+                      className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
+                      style={{
+                        backgroundColor: isSupabaseConfigured() ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.15)',
+                        color: isSupabaseConfigured() ? '#22c55e' : '#eab308',
+                      }}
+                    >
+                      {isSupabaseConfigured() ? 'Active / Connected' : 'Ready / Configurable'}
+                    </span>
+                  </div>
+                  <div className="text-[11px] leading-relaxed opacity-75" style={{ color: 'var(--text-muted)' }}>
+                    ERROREN backend is powered by Supabase. Your settings, conversations, and account state can be synced across devices via your project URL.
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-primary)' }}>
+                      Supabase Project URL
+                    </label>
+                    <input
+                      type="text"
+                      value={supabaseUrl}
+                      onChange={e => setSupabaseUrl(e.target.value)}
+                      placeholder="https://your-project.supabase.co"
+                      className="w-full p-2.5 rounded-lg border text-xs outline-none transition-colors"
+                      style={{
+                        backgroundColor: 'var(--bg-surface)',
+                        borderColor: 'var(--border-base)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-primary)' }}>
+                      Supabase Anon / Public Key
+                    </label>
+                    <input
+                      type="password"
+                      value={supabaseKey}
+                      onChange={e => setSupabaseKey(e.target.value)}
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      className="w-full p-2.5 rounded-lg border text-xs outline-none transition-colors"
+                      style={{
+                        backgroundColor: 'var(--bg-surface)',
+                        borderColor: 'var(--border-base)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        localStorage.setItem('ERROREN_SUPABASE_URL', supabaseUrl.trim());
+                        localStorage.setItem('ERROREN_SUPABASE_ANON_KEY', supabaseKey.trim());
+                        setSupabaseStatus('Credentials saved successfully to ERROREN storage.');
+                        setTimeout(() => setSupabaseStatus(null), 3000);
+                      }}
+                      className="px-3 py-1.5 rounded-md border text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                      style={{
+                        backgroundColor: 'var(--accent)',
+                        borderColor: 'var(--accent)',
+                        color: 'var(--accent-text)',
+                      }}
+                    >
+                      Save Supabase Credentials
+                    </button>
+                    {supabaseStatus && (
+                      <span className="text-[11px] font-bold" style={{ color: 'var(--accent)' }}>
+                        {supabaseStatus}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

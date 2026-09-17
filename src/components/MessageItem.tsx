@@ -80,17 +80,24 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 backgroundColor: 'var(--accent-subtle)',
               }}
             >
-              USR
+              YOU
             </div>
           ) : (
             <div
-              className="w-8 h-8 rounded-md flex items-center justify-center text-[10px] font-mono font-black shadow-xs"
+              className="w-8 h-8 rounded-md flex items-center justify-center overflow-hidden shadow-xs border"
               style={{
-                backgroundColor: 'var(--accent)',
-                color: 'var(--accent-text)',
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-subtle)',
               }}
             >
-              ERR
+              <img
+                src="./logo.png"
+                alt="ERROREN"
+                className="w-full h-full object-contain p-0.5"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
             </div>
           )}
         </div>

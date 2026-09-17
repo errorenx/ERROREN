@@ -9,10 +9,29 @@ import {
   COLOR_PALETTES,
 } from './theme';
 
-const STORAGE_CONVERSATIONS_KEY = 'erroren_conversations_v2';
 const STORAGE_CURRENT_ID_KEY = 'erroren_active_chat_id_v2';
 const STORAGE_SETTINGS_KEY = 'erroren_settings_v2';
 const STORAGE_USER_PROFILE_KEY = 'erroren_user_profile_v2';
+
+export function getConversationsStorageKey(userId?: string | null): string {
+  if (userId) {
+    return `erroren_conversations_user_${userId}`;
+  }
+  if (typeof window === 'undefined') return 'erroren_conversations_guest';
+  let guestId = localStorage.getItem('erroren_guest_session_id');
+  if (!guestId) {
+    guestId = 'guest_' + Math.random().toString(36).substring(2, 10);
+    localStorage.setItem('erroren_guest_session_id', guestId);
+  }
+  return `erroren_conversations_${guestId}`;
+}
+
+export function getActiveChatStorageKey(userId?: string | null): string {
+  if (userId) {
+    return `erroren_active_chat_user_${userId}`;
+  }
+  return STORAGE_CURRENT_ID_KEY;
+}
 
 export const DEFAULT_SETTINGS: AppSettings = {
   themeId: loadSavedThemeId() || DEFAULT_THEME_ID,
@@ -22,61 +41,69 @@ export const DEFAULT_SETTINGS: AppSettings = {
   streamResponses: true,
 };
 
-export const INITIAL_CONVERSATION: Conversation = {
-  id: 'conv_default',
-  title: 'Welcome to ERROREN',
-  createdAt: Date.now(),
-  updatedAt: Date.now(),
-  messages: [
-    {
-      id: 'welcome_1',
-      role: 'assistant',
-      content:
-        `Hello! I am **ERROREN**, your intelligent AI assistant.\n\n` +
-        `How can I assist you today? Feel free to ask me anything in **English**, **Roman Urdu** (jaise: *"kya haal hai?"*), or **Urdu** (اردو).\n\n` +
-        `- 💻 **Code & Architecture**: Debug errors, write algorithms, review code\n` +
-        `- ✍️ **Writing & Analysis**: Draft emails, summarize articles, brainstorm strategies\n` +
-        `- 🎨 **10 Color Themes**: Select from 5 dark & 5 light themes in Settings\n` +
-        `- 💾 **Instant Save**: Save your profile and chat history effortlessly with zero verification`,
-      timestamp: Date.now(),
-    },
-  ],
-};
+export function createInitialConversation(): Conversation {
+  return {
+    id: `conv_${Date.now()}`,
+    title: 'Welcome to ERROREN',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    messages: [
+      {
+        id: 'welcome_1',
+        role: 'assistant',
+        content:
+          `Hello! I am **ERROREN**, your intelligent AI assistant.\n\n` +
+          `How can I assist you today? Feel free to ask me anything in **English**, **Roman Urdu** (jaise: *"kya haal hai?"*), or **Urdu** (اردو).\n\n` +
+          `- 💻 **Code & Architecture**: Debug errors, write algorithms, review code\n` +
+          `- ✍️ **Writing & Analysis**: Draft emails, summarize articles, brainstorm strategies\n` +
+          `- 🎨 **10 Color Themes**: Select from 5 dark & 5 light themes in Settings\n` +
+          `- 💾 **Account Isolation**: Your chats are strictly private and isolated to your account.`,
+        timestamp: Date.now(),
+      },
+    ],
+  };
+}
 
-export function loadConversations(): Conversation[] {
+export const INITIAL_CONVERSATION: Conversation = createInitialConversation();
+
+export function loadConversations(userId?: string | null): Conversation[] {
   try {
-    const raw = localStorage.getItem(STORAGE_CONVERSATIONS_KEY);
-    if (!raw) return [INITIAL_CONVERSATION];
+    const key = getConversationsStorageKey(userId);
+    const raw = localStorage.getItem(key);
+    if (!raw) return [createInitialConversation()];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
       return parsed;
     }
-    return [INITIAL_CONVERSATION];
+    return [createInitialConversation()];
   } catch (err) {
     console.error('Failed to load conversations from localStorage', err);
-    return [INITIAL_CONVERSATION];
+    return [createInitialConversation()];
   }
 }
 
-export function saveConversations(conversations: Conversation[]): void {
+export function saveConversations(conversations: Conversation[], userId?: string | null): void {
   try {
-    localStorage.setItem(STORAGE_CONVERSATIONS_KEY, JSON.stringify(conversations));
+    const key = getConversationsStorageKey(userId);
+    localStorage.setItem(key, JSON.stringify(conversations));
   } catch (err) {
     console.error('Failed to save conversations to localStorage', err);
   }
 }
 
-export function loadActiveChatId(): string {
+export function loadActiveChatId(userId?: string | null): string {
   try {
-    return localStorage.getItem(STORAGE_CURRENT_ID_KEY) || INITIAL_CONVERSATION.id;
+    const key = getActiveChatStorageKey(userId);
+    return localStorage.getItem(key) || INITIAL_CONVERSATION.id;
   } catch {
     return INITIAL_CONVERSATION.id;
   }
 }
 
-export function saveActiveChatId(id: string): void {
+export function saveActiveChatId(id: string, userId?: string | null): void {
   try {
-    localStorage.setItem(STORAGE_CURRENT_ID_KEY, id);
+    const key = getActiveChatStorageKey(userId);
+    localStorage.setItem(key, id);
   } catch (err) {
     console.error('Failed to save active chat ID', err);
   }

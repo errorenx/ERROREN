@@ -209,27 +209,69 @@ app.post('/api/chat/stream', async (req: Request, res: Response): Promise<void> 
       }
     }
 
+    // If all Gemini models failed (e.g. 403 PERMISSION_DENIED or capacity limits), seamlessly activate Neural Multi-Lingual Intelligence
+    if (!streamSucceeded && !clientDisconnected) {
+      console.log('[ERROREN] Gemini models unavailable (403 or quota). Activating Multi-Lingual Neural Engine fallback...');
+      try {
+        const neuralMessages = [
+          {
+            role: 'system',
+            content: `${systemPrompt || DEFAULT_SYSTEM_INSTRUCTION}\n\nCRITICAL MULTI-LINGUAL DIRECTIVE:
+1. You are ERROREN AI, a world-class, highly knowledgeable synthetic intelligence.
+2. You understand and speak ALL languages with native fluency: English, Roman Urdu, Urdu (اردو), Hindi, Arabic, Spanish, French, German, Chinese, etc.
+3. ALWAYS reply in the EXACT language and script that the user spoke. If the user writes in Roman Urdu (e.g. "mjy batao", "kese ho", "code samjhao"), reply fluently in natural, respectful Roman Urdu. If in English, reply in English. If in Urdu script, reply in Urdu.
+4. Provide complete, accurate, technically sound, and deeply helpful answers with clean Markdown formatting, bullet points, and code blocks.`,
+          },
+          ...messages.map((m: any) => ({
+            role: m.role === 'user' ? 'user' : 'assistant',
+            content: m.text || m.content || '',
+          })),
+        ];
+
+        const neuralRes = await fetch('https://text.pollinations.ai/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: neuralMessages,
+            model: 'openai',
+            seed: 42,
+          }),
+        });
+
+        if (neuralRes.ok) {
+          const fullText = await neuralRes.text();
+          if (fullText && fullText.trim()) {
+            // Stream the text in progressive natural chunks for smooth real-time animation
+            const words = fullText.split(/(\s+)/);
+            let buffer = '';
+            for (let i = 0; i < words.length; i++) {
+              if (clientDisconnected) break;
+              buffer += words[i];
+              if (i % 3 === 0 || i === words.length - 1) {
+                res.write(`data: ${JSON.stringify({ chunk: buffer })}\n\n`);
+                (res as any).flush?.();
+                buffer = '';
+                await new Promise(r => setTimeout(r, 20));
+              }
+            }
+            streamSucceeded = true;
+          }
+        }
+      } catch (neuralErr: any) {
+        console.warn('[ERROREN] Neural fallback stream encountered error:', neuralErr?.message || neuralErr);
+      }
+    }
+
     if (streamSucceeded) {
       res.write('data: [DONE]\n\n');
       res.end();
       return;
     }
 
-    // If all models failed
+    // If both Gemini and Neural fallback failed
     console.error('All model attempts failed in /api/chat/stream:', lastError);
-    let userMessage =
-      'Main is waqt thoda busy hoon ya connection issue hai. Baraye meherbani thori dair baad dobara koshish karein.';
-    if (lastError?.message && typeof lastError.message === 'string') {
-      try {
-        const parsed = JSON.parse(lastError.message);
-        if (parsed?.error?.message) {
-          userMessage = parsed.error.message;
-        }
-      } catch {
-        userMessage = lastError.message;
-      }
-    }
-
+    const userMessage =
+      'Main is waqt connection issue me hoon. Baraye meherbani thori dair baad dobara koshish karein ya naya sawal poochein.';
     res.write(`data: ${JSON.stringify({ error: userMessage })}\n\n`);
     res.write('data: [DONE]\n\n');
     res.end();
@@ -279,16 +321,113 @@ app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
       }
     }
 
+    // If Gemini fails, fallback to multi-lingual neural engine
+    try {
+      const neuralMessages = [
+        {
+          role: 'system',
+          content: `${systemPrompt || DEFAULT_SYSTEM_INSTRUCTION}\n\nCRITICAL MULTI-LINGUAL DIRECTIVE:
+1. You are ERROREN AI, an advanced AI Assistant.
+2. You understand all languages fluently: English, Roman Urdu, Urdu (اردو), Hindi, Arabic, Spanish, French, German, Chinese, etc.
+3. ALWAYS reply in the exact language the user wrote in (Roman Urdu for Roman Urdu, Urdu for Urdu, English for English).
+4. Provide comprehensive, accurate, high-quality answers with clean Markdown formatting, bullet points, and code blocks.`,
+        },
+        ...messages.map((m: any) => ({
+          role: m.role === 'user' ? 'user' : 'assistant',
+          content: m.text || m.content || '',
+        })),
+      ];
+
+      const neuralRes = await fetch('https://text.pollinations.ai/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: neuralMessages,
+          model: 'openai',
+          seed: 42,
+        }),
+      });
+
+      if (neuralRes.ok) {
+        const text = await neuralRes.text();
+        if (text && text.trim()) {
+          res.json({ text: text.trim() });
+          return;
+        }
+      }
+    } catch (neuralErr) {
+      console.warn('[ERROREN non-stream] Neural fallback failed:', neuralErr);
+    }
+
     res.status(503).json({
       error: lastError?.message || 'AI service currently unavailable across all model endpoints.',
     });
   } catch (error: any) {
+    // Also catch any client init error and try neural
+    try {
+      const neuralMessages = [
+        {
+          role: 'system',
+          content: `${systemPrompt || DEFAULT_SYSTEM_INSTRUCTION}\n\nAlways reply in the user's language (e.g. Roman Urdu if Roman Urdu, English if English).`,
+        },
+        ...messages.map((m: any) => ({
+          role: m.role === 'user' ? 'user' : 'assistant',
+          content: m.text || m.content || '',
+        })),
+      ];
+      const fallbackRes = await fetch('https://text.pollinations.ai/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: neuralMessages, model: 'openai' }),
+      });
+      if (fallbackRes.ok) {
+        const text = await fallbackRes.text();
+        if (text && text.trim()) {
+          res.json({ text: text.trim() });
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     console.error('Error generating response in /api/chat:', error);
     res.status(500).json({
       error: error?.message || 'Failed to generate response.',
     });
   }
 });
+
+// Helper to translate & optimize multi-lingual / Roman Urdu image prompts
+function enhanceImagePrompt(prompt: string): string {
+  let p = prompt.trim();
+  const lower = p.toLowerCase();
+
+  const isRomanUrdu =
+    /mjy|mujhe|mujhy|mujy|chay|chahiye|isky|iski|iske|bna|bana|tasveer|tasweer|bagh|gari|gaari/i.test(lower);
+
+  if (isRomanUrdu) {
+    let t = p;
+    // Map common Roman Urdu phrases
+    t = t.replace(/mjy|mujhe|mujhy|mujy/gi, '');
+    t = t.replace(/\bik\b|\baik\b|\bek\b/gi, 'a');
+    t = t.replace(/ki photo chay|ki photo chahiye|ki image chay|ki image chahiye|\bchahiye\b|\bchay\b/gi, '');
+    t = t.replace(/\bjo ik\b|\bjo ek\b|\bjo\b/gi, 'in');
+    t = t.replace(/garden my ho|garden me ho|bagh me ho|garden mai ho/gi, 'in a lush green garden');
+    t = t.replace(/isky sath|iski sath|iske sath/gi, 'and next to it');
+    t = t.replace(/ik bike ho|ek bike ho|\bbike ho\b/gi, 'a stylish motorbike');
+    t = t.replace(/gari|gaari/gi, 'car');
+    t = t.replace(/tasveer|tasweer|photo|image|picture/gi, '');
+    t = t.replace(/bana k do|bna k do|bna do|bana do|banao|bnayo|create karo|generate karo/gi, '');
+    t = t.replace(/\s+/g, ' ').trim();
+
+    if (t.length > 2) {
+      return `${t}, photorealistic, vibrant cinematic lighting, highly detailed 4k`;
+    }
+  }
+
+  return p;
+}
 
 // Image Generation & Editing API Endpoint
 app.post('/api/generate-image', async (req: Request, res: Response): Promise<void> => {
@@ -300,7 +439,8 @@ app.post('/api/generate-image', async (req: Request, res: Response): Promise<voi
   }
 
   const cleanPrompt = prompt.trim();
-  console.log(`[ERROREN Image API] Request received for prompt: "${cleanPrompt}", hasImage: ${!!image?.data}`);
+  const effectivePrompt = enhanceImagePrompt(cleanPrompt);
+  console.log(`[ERROREN Image API] Request received for prompt: "${cleanPrompt}", effective: "${effectivePrompt}", hasImage: ${!!image?.data}`);
 
   // 1. First attempt with Gemini Nano/Flash image generation model if key is configured
   try {
@@ -315,10 +455,10 @@ app.post('/api/generate-image', async (req: Request, res: Response): Promise<voi
         },
       });
       parts.push({
-        text: cleanPrompt || 'Edit and transform this image according to user instructions.',
+        text: effectivePrompt || 'Edit and transform this image according to user instructions.',
       });
     } else {
-      parts.push({ text: cleanPrompt });
+      parts.push({ text: effectivePrompt });
     }
 
     // Try Gemini image model
@@ -336,10 +476,13 @@ app.post('/api/generate-image', async (req: Request, res: Response): Promise<voi
       if ((part as any).inlineData) {
         const mime = (part as any).inlineData.mimeType || 'image/png';
         const b64 = (part as any).inlineData.data;
+        const dataUri = `data:${mime};base64,${b64}`;
         console.log('[ERROREN Image API] Successfully generated with Gemini Imagen model!');
         res.json({
-          imageUrl: `data:${mime};base64,${b64}`,
+          url: dataUri,
+          imageUrl: dataUri,
           prompt: cleanPrompt,
+          revisedPrompt: effectivePrompt !== cleanPrompt ? effectivePrompt : undefined,
           source: 'gemini',
         });
         return;
@@ -366,7 +509,7 @@ app.post('/api/generate-image', async (req: Request, res: Response): Promise<voi
     }
 
     const seed = Math.floor(Math.random() * 900000) + 100000;
-    const encodedPrompt = encodeURIComponent(cleanPrompt);
+    const encodedPrompt = encodeURIComponent(effectivePrompt);
     const neuralUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true`;
 
     console.log(`[ERROREN Image API] Generating via Neural Engine: ${neuralUrl}`);
@@ -378,9 +521,12 @@ app.post('/api/generate-image', async (req: Request, res: Response): Promise<voi
         const arrayBuf = await response.arrayBuffer();
         const base64Str = Buffer.from(arrayBuf).toString('base64');
         const mimeType = response.headers.get('content-type') || 'image/jpeg';
+        const dataUri = `data:${mimeType};base64,${base64Str}`;
         res.json({
-          imageUrl: `data:${mimeType};base64,${base64Str}`,
+          url: dataUri,
+          imageUrl: dataUri,
           prompt: cleanPrompt,
+          revisedPrompt: effectivePrompt !== cleanPrompt ? effectivePrompt : undefined,
           source: 'neural',
         });
         return;
@@ -391,8 +537,10 @@ app.post('/api/generate-image', async (req: Request, res: Response): Promise<voi
 
     // Direct URL fallback if fetch times out
     res.json({
+      url: neuralUrl,
       imageUrl: neuralUrl,
       prompt: cleanPrompt,
+      revisedPrompt: effectivePrompt !== cleanPrompt ? effectivePrompt : undefined,
       source: 'neural_url',
     });
   } catch (finalErr: any) {

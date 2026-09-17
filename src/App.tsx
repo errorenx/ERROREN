@@ -48,8 +48,16 @@ import {
 } from './utils/theme';
 
 export default function App() {
-  const [conversations, setConversations] = useState<Conversation[]>(() => loadConversations());
-  const [activeId, setActiveId] = useState<string>(() => loadActiveChatId());
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [localProfile, setLocalProfile] = useState<UserProfile | null>(() => loadLocalProfile());
+  const [conversations, setConversations] = useState<Conversation[]>(() => {
+    const profile = loadLocalProfile();
+    return loadConversations(profile?.id || null);
+  });
+  const [activeId, setActiveId] = useState<string>(() => {
+    const profile = loadLocalProfile();
+    return loadActiveChatId(profile?.id || null);
+  });
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
   const [projects, setProjects] = useState<Project[]>(() => loadProjects());
   const [activeProjectId, setActiveProjectId] = useState<string | null>(() => loadActiveProjectId());
@@ -59,8 +67,6 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAccountOpen, setIsAccountOpen] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [localProfile, setLocalProfile] = useState<UserProfile | null>(() => loadLocalProfile());
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -86,60 +92,55 @@ export default function App() {
       const unsubscribe = onAuthStateChanged(auth, async user => {
         setCurrentUser(user);
         if (user) {
-        // If logged in via Google and no local profile name, populate local profile
-        if (!localProfile) {
+          // If logged in via Google and no local profile name, populate local profile
           const profile: UserProfile = {
             id: user.uid,
-            name: user.displayName || 'Google User',
+            name: user.displayName || localProfile?.name || 'User',
             email: user.email || '',
             avatar: user.photoURL || undefined,
             savedAt: Date.now(),
           };
           setLocalProfile(profile);
           saveLocalProfile(profile);
-        }
 
-        try {
-          const cloudChats = await loadCloudConversations(user.uid);
-          if (cloudChats.length > 0) {
-            setConversations(prevLocal => {
-              const cloudIds = new Set(cloudChats.map(c => c.id));
-              const localOnly = prevLocal.filter(c => !cloudIds.has(c.id) && c.messages.length > 0);
+          // 1. Strictly load this user's OWN isolated conversations from localStorage cache
+          const userLocalChats = loadConversations(user.uid);
+          setConversations(userLocalChats);
 
-              localOnly.forEach(localChat => {
-                saveConversationToCloud(user.uid, localChat).catch(err =>
-                  console.warn('Backup local chat to cloud error:', err)
-                );
-              });
-
-              const merged = [...cloudChats, ...localOnly].sort(
-                (a, b) => b.updatedAt - a.updatedAt
-              );
-              return merged;
-            });
-
-            if (!cloudChats.some(c => c.id === activeId) && cloudChats[0]) {
-              setActiveId(cloudChats[0].id);
-            }
-          } else {
-            setConversations(prevLocal => {
-              prevLocal.forEach(c => {
+          try {
+            // 2. Fetch cloud chats strictly for THIS user
+            const cloudChats = await loadCloudConversations(user.uid);
+            if (cloudChats.length > 0) {
+              setConversations(cloudChats);
+              const savedActiveId = loadActiveChatId(user.uid);
+              if (cloudChats.some(c => c.id === savedActiveId)) {
+                setActiveId(savedActiveId);
+              } else {
+                setActiveId(cloudChats[0].id);
+              }
+            } else if (userLocalChats.length > 0) {
+              // Upload only this user's own local chats to cloud
+              userLocalChats.forEach(c => {
                 if (c.messages.length > 0) {
                   saveConversationToCloud(user.uid, c).catch(err =>
-                    console.warn('Initial cloud sync error:', err)
+                    console.warn('User cloud sync error:', err)
                   );
                 }
               });
-              return prevLocal;
-            });
+            }
+          } catch (err) {
+            console.error('Failed to sync cloud conversations:', err);
           }
-        } catch (err) {
-          console.error('Failed to sync cloud conversations:', err);
+        } else {
+          // User logged out or guest: strictly load isolated guest chats
+          const guestChats = loadConversations(null);
+          setConversations(guestChats);
+          const guestActiveId = loadActiveChatId(null) || guestChats[0]?.id || 'conv_default';
+          setActiveId(guestActiveId);
         }
-      }
-    }, err => {
-      console.warn('onAuthStateChanged listener warning:', err);
-    });
+      }, err => {
+        console.warn('onAuthStateChanged listener warning:', err);
+      });
 
       return () => unsubscribe();
     } catch (err) {
@@ -147,14 +148,16 @@ export default function App() {
     }
   }, []);
 
-  // Sync active chat ID & conversations with localStorage
+  // Sync active chat ID & conversations with localStorage strictly per user
   useEffect(() => {
-    saveConversations(conversations);
-  }, [conversations]);
+    const userId = currentUser?.uid || localProfile?.id || null;
+    saveConversations(conversations, userId);
+  }, [conversations, currentUser?.uid, localProfile?.id]);
 
   useEffect(() => {
-    saveActiveChatId(activeId);
-  }, [activeId]);
+    const userId = currentUser?.uid || localProfile?.id || null;
+    saveActiveChatId(activeId, userId);
+  }, [activeId, currentUser?.uid, localProfile?.id]);
 
   // Global Keyboard Shortcuts (Ctrl/Cmd + K for new chat)
   useEffect(() => {
@@ -223,6 +226,15 @@ export default function App() {
   const handleSaveProfile = (profile: UserProfile) => {
     setLocalProfile(profile);
     saveLocalProfile(profile);
+    // Switch to this user's isolated conversations
+    const userChats = loadConversations(profile.id);
+    setConversations(userChats);
+    const activeChatId = loadActiveChatId(profile.id);
+    if (userChats.some(c => c.id === activeChatId)) {
+      setActiveId(activeChatId);
+    } else {
+      setActiveId(userChats[0]?.id || 'conv_default');
+    }
   };
 
   const handleLogoutProfile = async () => {
@@ -231,6 +243,11 @@ export default function App() {
     if (currentUser) {
       await logOut().catch(console.error);
     }
+    // Switch immediately to isolated guest chats so no chats are leaked or mixed
+    const guestChats = loadConversations(null);
+    setConversations(guestChats);
+    const guestActiveId = loadActiveChatId(null) || guestChats[0]?.id || 'conv_default';
+    setActiveId(guestActiveId);
   };
 
   const handleSelectProject = (projectId: string | null) => {
@@ -419,7 +436,7 @@ export default function App() {
 
       if (!response.ok) {
         // Check if server is running or if static environment (e.g. GitHub Pages)
-        if (response.status === 404) {
+        if (response.status === 404 || response.status >= 500) {
           if (settings.clientApiKey) {
             // Direct client call for static GitHub Pages deployment with user-provided Gemini API key
             try {
@@ -454,13 +471,67 @@ export default function App() {
                 return;
               }
             } catch (directErr: any) {
-              console.warn('Client-side direct Gemini fetch error:', directErr);
+              console.warn('Client-side direct Gemini fetch notice:', directErr);
             }
           }
 
-          throw new Error(
-            'ERROREN is deployed on static GitHub Pages. To chat here without a backend server, please enter your free Gemini API Key in Settings (⚙️ top right > AI Persona & API tab).'
-          );
+          // Resilient Neural Engine Fallback (Supports English, Roman Urdu & All Languages on Static GitHub Pages)
+          try {
+            const fallbackMessages = [
+              {
+                role: 'system',
+                content:
+                  combinedSystemPrompt ||
+                  'You are ERROREN, a friendly, ultra-fast, and precise AI assistant. You speak and understand English, Roman Urdu (e.g., "aap kaise hain", "mujhe code chahiye", "kya haal hy"), Urdu, and other languages fluently. Always respond in the language the user speaks. Provide clean Markdown with properly formatted code blocks.',
+              },
+              ...historyForApi.map(m => ({
+                role: m.role === 'user' ? 'user' : 'assistant',
+                content: m.text || '',
+              })),
+            ];
+
+            const neuralRes = await fetch('https://text.pollinations.ai/', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                messages: fallbackMessages,
+                model: 'openai',
+                seed: 42,
+              }),
+              signal: abortController.signal,
+            });
+
+            if (neuralRes.ok) {
+              const neuralText = await neuralRes.text();
+              const cleanOutput = neuralText.trim() || 'I am ERROREN. How can I assist you?';
+              
+              // Simulate smooth progressive rendering
+              const words = cleanOutput.split(' ');
+              let accumulated = '';
+              for (let i = 0; i < words.length; i++) {
+                accumulated += (i > 0 ? ' ' : '') + words[i];
+                if (i % 3 === 0 || i === words.length - 1) {
+                  setConversations(prev =>
+                    prev.map(conv => {
+                      if (conv.id !== conversationId) return conv;
+                      return {
+                        ...conv,
+                        messages: conv.messages.map(m =>
+                          m.id === assistantMsgId
+                            ? { ...m, content: accumulated, isStreaming: i < words.length - 1 }
+                            : m
+                        ),
+                      };
+                    })
+                  );
+                  await new Promise(r => setTimeout(r, 20));
+                }
+              }
+              return;
+            }
+          } catch (neuralErr) {
+            console.warn('Neural client fallback notice:', neuralErr);
+          }
         }
         throw new Error(`Server returned error: ${response.status} ${response.statusText}`);
       }
@@ -739,7 +810,8 @@ export default function App() {
         }
 
         const data = await response.json();
-        if (data.url) {
+        const generatedImgUrl = data.url || data.imageUrl;
+        if (generatedImgUrl) {
           setConversations(prev =>
             prev.map(c => {
               if (c.id !== currentConv.id) return c;
@@ -754,7 +826,7 @@ export default function App() {
                           ? `Here is your generated photo:\n\n*${data.revisedPrompt}*`
                           : `Here is your requested photo:`,
                         generatedImage: {
-                          url: data.url,
+                          url: generatedImgUrl,
                           prompt: text,
                           revisedPrompt: data.revisedPrompt,
                           aspectRatio: data.aspectRatio || '1:1',
@@ -775,7 +847,44 @@ export default function App() {
           throw new Error(data.error || 'No image returned');
         }
       } catch (imgErr: any) {
-        console.warn('In-chat image generation fallback notice:', imgErr);
+        console.warn('Backend image endpoint unavailable, generating via direct neural engine:', imgErr);
+        try {
+          const directImgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+            text
+          )}?width=1024&height=1024&seed=${Math.floor(Math.random() * 1000000)}&nologo=true`;
+
+          setConversations(prev =>
+            prev.map(c => {
+              if (c.id !== currentConv.id) return c;
+              const finishedConv: Conversation = {
+                ...c,
+                updatedAt: Date.now(),
+                messages: c.messages.map(m =>
+                  m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        content: `Here is your generated photo:`,
+                        generatedImage: {
+                          url: directImgUrl,
+                          prompt: text,
+                          aspectRatio: '1:1',
+                        },
+                        isStreaming: false,
+                      }
+                    : m
+                ),
+              };
+              if (currentUser) {
+                saveConversationToCloud(currentUser.uid, finishedConv).catch(console.error);
+              }
+              return finishedConv;
+            })
+          );
+          return;
+        } catch (directImgErr) {
+          console.error('Direct neural image error:', directImgErr);
+        }
+
         // Fall back to standard streaming text model
         setConversations(prev =>
           prev.map(c => {

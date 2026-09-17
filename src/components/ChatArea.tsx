@@ -213,19 +213,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           )}
 
           <div className="flex items-center gap-2 min-w-0">
-            <div className="relative flex items-center justify-center shrink-0">
-              <span
-                className="w-2.5 h-2.5 rounded-full"
-                style={{
-                  backgroundColor: 'var(--accent)',
-                  boxShadow: `0 0 8px var(--accent)`,
-                }}
-              />
-              <span
-                className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-60"
-                style={{ backgroundColor: 'var(--accent)' }}
-              />
-            </div>
+            <img
+              src="./logo.png"
+              alt="ERROREN"
+              className="w-6 h-6 rounded-md object-contain shrink-0 shadow-xs"
+              onError={(e) => {
+                // fallback if image not loaded yet
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+            />
 
             <div className="flex items-center gap-1.5 min-w-0">
               <span
@@ -281,102 +277,36 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       <div className="flex-1 overflow-y-auto relative">
         {isEmpty ? (
           <div className="min-h-full flex flex-col justify-center items-center px-4 py-8 max-w-3xl mx-auto">
-            {/* Unique Futuristic Neural Core Emblem */}
-            <div className="relative mb-6 flex items-center justify-center">
-              {/* Pulsing Radial Halo */}
+            {/* Official ERROREN Glowing Logo Display */}
+            <div className="relative mb-5 flex items-center justify-center">
               <div
-                className="absolute w-24 h-24 rounded-full blur-xl opacity-30 animate-pulse pointer-events-none"
+                className="absolute w-32 h-32 rounded-3xl blur-2xl opacity-40 animate-pulse pointer-events-none"
                 style={{ backgroundColor: 'var(--accent)' }}
               />
 
               <div
-                className="w-16 h-16 rounded-2xl border flex items-center justify-center font-mono text-2xl font-black shadow-xl relative z-10 transition-all duration-300"
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl p-1.5 border relative z-10 shadow-2xl transition-transform hover:scale-105"
                 style={{
                   backgroundColor: 'var(--bg-card)',
                   borderColor: 'var(--accent)',
-                  color: 'var(--accent)',
-                  boxShadow: `0 0 24px var(--accent-subtle)`,
+                  boxShadow: `0 0 30px var(--accent-subtle)`,
                 }}
               >
-                <span>ERR</span>
-              </div>
-              <div
-                className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold font-mono z-20 shadow-md"
-                style={{
-                  backgroundColor: 'var(--accent)',
-                  color: 'var(--accent-text)',
-                }}
-              >
-                +
+                <img
+                  src="./logo.png"
+                  alt="ERROREN AI Logo"
+                  className="w-full h-full object-contain rounded-2xl"
+                />
               </div>
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-black text-center tracking-tight mb-2 font-mono" style={{ color: 'var(--text-primary)' }}>
-              SYNTHETIC INTELLIGENCE
+              ERROREN AI
             </h1>
 
-            {/* Futuristic Telemetry HUD Tag */}
-            <div
-              className="flex items-center gap-2 px-3 py-1 rounded-full border text-[10px] font-mono font-bold mb-6 uppercase tracking-wider"
-              style={{
-                backgroundColor: 'var(--accent-subtle)',
-                borderColor: 'var(--border-subtle)',
-                color: 'var(--accent)',
-              }}
-            >
-              <Sparkles className="w-3 h-3" />
-              <span>{safeMode === 'dark' ? 'Dark Mode' : 'Light Mode'} // Color: {activeColorDef.name}</span>
-            </div>
-
-            <p className="text-xs sm:text-sm text-center max-w-md mb-8 leading-relaxed font-mono opacity-70" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs sm:text-sm text-center max-w-lg leading-relaxed font-mono opacity-80" style={{ color: 'var(--text-muted)' }}>
               Ask technical questions, dissect architecture, analyze code, or converse in English &amp; Roman Urdu.
             </p>
-
-            {/* Starter Prompt Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
-              {STARTER_PROMPTS.map((item, idx) => {
-                const IconComponent = item.icon;
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => onSendMessage(item.prompt)}
-                    className="flex flex-col text-left p-4 rounded-xl border transition-all group cursor-pointer hover:scale-[1.01]"
-                    style={{
-                      backgroundColor: 'var(--bg-card)',
-                      borderColor: 'var(--border-subtle)',
-                    }}
-                  >
-                    <div className="flex items-center justify-between w-full mb-2">
-                      <div
-                        className="p-1.5 rounded-lg border flex items-center justify-center"
-                        style={{
-                          backgroundColor: 'var(--accent-subtle)',
-                          borderColor: 'var(--border-subtle)',
-                          color: 'var(--accent)',
-                        }}
-                      >
-                        <IconComponent className="w-4 h-4" />
-                      </div>
-                      <span className="text-[10px] font-mono opacity-50 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                        {item.category}
-                      </span>
-                    </div>
-
-                    <div className="text-xs font-bold mb-1 group-hover:text-(--accent) transition-colors font-mono" style={{ color: 'var(--text-primary)' }}>
-                      {item.title}
-                    </div>
-                    <div className="text-[11px] line-clamp-2 leading-relaxed opacity-75 font-mono" style={{ color: 'var(--text-secondary)' }}>
-                      {item.prompt}
-                    </div>
-
-                    <div className="mt-3 flex items-center gap-1 text-[10px] font-mono font-bold opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--accent)' }}>
-                      <span>Run Prompt</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
           </div>
         ) : (
           <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">

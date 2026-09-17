@@ -130,15 +130,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           style={{ borderColor: 'var(--border-subtle)' }}
         >
           <div className="flex items-center gap-2.5">
-            <div
-              className="w-8 h-8 rounded-md flex items-center justify-center font-mono text-sm font-black transition-transform hover:scale-105"
-              style={{
-                backgroundColor: 'var(--accent)',
-                color: 'var(--accent-text)',
+            <img
+              src="./logo.png"
+              alt="ERROREN"
+              className="w-8 h-8 rounded-lg object-contain transition-transform hover:scale-105 shadow-xs"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
               }}
-            >
-              ERR
-            </div>
+            />
             <div>
               <div className="font-mono text-sm font-black tracking-wider flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
                 <span>ERROREN</span>
