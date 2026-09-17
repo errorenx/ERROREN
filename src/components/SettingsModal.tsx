@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sliders, Trash2, Download, Sparkles, Command, Palette } from 'lucide-react';
-import { AppSettings, Conversation } from '../types';
+import { X, Sliders, Sparkles, Palette, User, Share2, Copy, Download, Check, Sun, Moon, LogOut } from 'lucide-react';
+import { AppSettings, Conversation, UserProfile } from '../types';
 import { ThemeSelector } from './ThemeSelector';
-import { ColorId, ThemeId, ThemeMode, applyTheme, THEMES } from '../utils/theme';
+import { ColorId, ThemeMode, applyTheme } from '../utils/theme';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: AppSettings;
   onSaveSettings: (newSettings: AppSettings) => void;
-  onClearAllChats: () => void;
+  onClearAllChats?: () => void;
   currentConversation?: Conversation;
+  currentProfile?: UserProfile | null;
+  onOpenAccount?: () => void;
+  onLogoutProfile?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -18,11 +21,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   settings,
   onSaveSettings,
-  onClearAllChats,
   currentConversation,
+  currentProfile,
+  onOpenAccount,
+  onLogoutProfile,
 }) => {
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
-  const [activeTab, setActiveTab] = useState<'appearance' | 'system' | 'data'>('appearance');
+  const [activeTab, setActiveTab] = useState<'appearance' | 'profile' | 'share' | 'system'>('appearance');
+  const [copiedShare, setCopiedShare] = useState(false);
+  const [copiedTranscript, setCopiedTranscript] = useState(false);
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -54,29 +61,48 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onSaveSettings(updated);
   };
 
-  const handleSaveAndClose = () => {
-    onSaveSettings(localSettings);
-    onClose();
+  const handleCopyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopiedShare(true);
+      setTimeout(() => setCopiedShare(false), 2000);
+    } catch {
+      // fallback
+    }
   };
 
-  const handleExportMarkdown = () => {
-    if (!currentConversation || currentConversation.messages.length === 0) {
-      alert('No messages to export.');
-      return;
+  const handleCopyTranscript = async () => {
+    if (!currentConversation) return;
+    const text = currentConversation.messages
+      .map(m => `[${m.role.toUpperCase()}]\n${m.content}`)
+      .join('\n\n---\n\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedTranscript(true);
+      setTimeout(() => setCopiedTranscript(false), 2000);
+    } catch {
+      // fallback
     }
-    let md = `# ${currentConversation.title}\n*Exported from ERROREN on ${new Date().toLocaleString()}*\n\n---\n\n`;
-    currentConversation.messages.forEach(m => {
-      const roleName = m.role === 'user' ? 'User' : 'ERROREN';
-      md += `### ${roleName} (${new Date(m.timestamp).toLocaleTimeString()}):\n\n${m.content}\n\n---\n\n`;
-    });
+  };
 
-    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
+  const handleDownloadMarkdown = () => {
+    if (!currentConversation) return;
+    const text = `# ${currentConversation.title}\n\nDate: ${new Date(currentConversation.createdAt).toLocaleString()}\n\n` +
+      currentConversation.messages
+        .map(m => `### ${m.role === 'user' ? 'User' : 'ERROREN'}\n\n${m.content}`)
+        .join('\n\n---\n\n');
+    const blob = new Blob([text], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${currentConversation.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'erroren_chat'}.md`;
+    a.download = `${currentConversation.title.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'chat'}.md`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleSaveAndClose = () => {
+    onSaveSettings(localSettings);
+    onClose();
   };
 
   return (
@@ -112,7 +138,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 Preferences &amp; Settings
               </h2>
               <p className="text-[11px] opacity-70" style={{ color: 'var(--text-muted)' }}>
-                Customize color theme, persona, and storage
+                Customize color theme, dark/light mode, profile, and share options
               </p>
             </div>
           </div>
@@ -127,7 +153,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Tab Navigation */}
         <div
-          className="flex items-center gap-2 px-6 pt-3 border-b text-xs shrink-0"
+          className="flex items-center gap-2 px-6 pt-3 border-b text-xs shrink-0 overflow-x-auto"
           style={{
             backgroundColor: 'var(--bg-surface)',
             borderColor: 'var(--border-subtle)',
@@ -136,7 +162,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('appearance')}
-            className={`pb-2.5 font-bold uppercase tracking-wider text-[11px] border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`pb-2.5 font-bold uppercase tracking-wider text-[11px] border-b-2 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
               activeTab === 'appearance' ? 'opacity-100' : 'opacity-60 hover:opacity-90'
             }`}
             style={{
@@ -145,13 +171,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             }}
           >
             <Palette className="w-3.5 h-3.5" />
-            <span>10 Color Themes</span>
+            <span>Theme &amp; Colors</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('profile')}
+            className={`pb-2.5 font-bold uppercase tracking-wider text-[11px] border-b-2 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'profile' ? 'opacity-100' : 'opacity-60 hover:opacity-90'
+            }`}
+            style={{
+              borderColor: activeTab === 'profile' ? 'var(--accent)' : 'transparent',
+              color: activeTab === 'profile' ? 'var(--text-primary)' : 'var(--text-muted)',
+            }}
+          >
+            <User className="w-3.5 h-3.5" />
+            <span>Profile Setting</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('share')}
+            className={`pb-2.5 font-bold uppercase tracking-wider text-[11px] border-b-2 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'share' ? 'opacity-100' : 'opacity-60 hover:opacity-90'
+            }`}
+            style={{
+              borderColor: activeTab === 'share' ? 'var(--accent)' : 'transparent',
+              color: activeTab === 'share' ? 'var(--text-primary)' : 'var(--text-muted)',
+            }}
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span>Share &amp; Export</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('system')}
-            className={`pb-2.5 font-bold uppercase tracking-wider text-[11px] border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`pb-2.5 font-bold uppercase tracking-wider text-[11px] border-b-2 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
               activeTab === 'system' ? 'opacity-100' : 'opacity-60 hover:opacity-90'
             }`}
             style={{
@@ -162,21 +218,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <Sparkles className="w-3.5 h-3.5" />
             <span>AI Persona</span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('data')}
-            className={`pb-2.5 font-bold uppercase tracking-wider text-[11px] border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'data' ? 'opacity-100' : 'opacity-60 hover:opacity-90'
-            }`}
-            style={{
-              borderColor: activeTab === 'data' ? 'var(--accent)' : 'transparent',
-              color: activeTab === 'data' ? 'var(--text-primary)' : 'var(--text-muted)',
-            }}
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Data &amp; Shortcuts</span>
-          </button>
         </div>
 
         {/* Tab Body */}
@@ -185,10 +226,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div>
               <div className="mb-4">
                 <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
-                  Appearance &amp; Color System
+                  Theme Mode &amp; Color Palettes
                 </h3>
                 <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  Independent Dark Mode &amp; Light Mode controls paired with 10 separate signature accent colors. Fully active across the entire application.
+                  Dark &amp; Light modes paired with high-contrast color themes including Black, White, and Rainbow (Rambo).
                 </p>
               </div>
 
@@ -198,6 +239,185 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onSelectMode={handleSelectMode}
                 onSelectColor={handleSelectColor}
               />
+            </div>
+          )}
+
+          {activeTab === 'profile' && (
+            <div className="space-y-4">
+              <div className="mb-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
+                  User Account &amp; Profile Setting
+                </h3>
+                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  Manage your personal user profile, customize your identity, or log in with email.
+                </p>
+              </div>
+
+              <div
+                className="p-4 rounded-xl border flex items-center justify-between"
+                style={{
+                  backgroundColor: 'var(--bg-base)',
+                  borderColor: 'var(--border-subtle)',
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center font-mono text-sm font-bold shadow-xs"
+                    style={{
+                      backgroundColor: 'var(--accent)',
+                      color: 'var(--accent-text)',
+                    }}
+                  >
+                    {currentProfile?.avatar ? (
+                      <img
+                        src={currentProfile.avatar}
+                        alt={currentProfile.name}
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : currentProfile?.name ? (
+                      currentProfile.name.slice(0, 2).toUpperCase()
+                    ) : (
+                      <User className="w-6 h-6" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
+                      {currentProfile?.name || 'Guest User'}
+                    </div>
+                    <div className="text-[11px] opacity-70" style={{ color: 'var(--text-muted)' }}>
+                      {currentProfile?.email || 'No email account linked'}
+                    </div>
+                    {currentProfile?.bio && (
+                      <div className="text-[11px] mt-1 italic opacity-80" style={{ color: 'var(--text-secondary)' }}>
+                        &ldquo;{currentProfile.bio}&rdquo;
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenAccount?.();
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-wider cursor-pointer transition-all"
+                    style={{
+                      backgroundColor: 'var(--accent-subtle)',
+                      borderColor: 'var(--accent)',
+                      color: 'var(--accent)',
+                    }}
+                  >
+                    {currentProfile ? 'Edit Profile' : 'Sign In / Register'}
+                  </button>
+
+                  {currentProfile && onLogoutProfile && (
+                    <button
+                      type="button"
+                      onClick={onLogoutProfile}
+                      className="p-2 rounded-lg border text-xs cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
+                      style={{
+                        backgroundColor: 'var(--bg-card)',
+                        borderColor: 'var(--border-subtle)',
+                        color: 'var(--text-muted)',
+                      }}
+                      title="Log out"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'share' && (
+            <div className="space-y-4">
+              <div className="mb-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
+                  Share &amp; Export Chat
+                </h3>
+                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  Share conversation link or download current chat thread.
+                </p>
+              </div>
+
+              {/* Share link */}
+              <div
+                className="p-4 rounded-xl border space-y-2"
+                style={{
+                  backgroundColor: 'var(--bg-base)',
+                  borderColor: 'var(--border-subtle)',
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-xs" style={{ color: 'var(--text-primary)' }}>
+                      Applet Share Link
+                    </div>
+                    <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                      Copy current applet URL to clipboard
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyShareLink}
+                    className="px-3 py-1.5 rounded-md border text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
+                    style={{
+                      backgroundColor: 'var(--accent-subtle)',
+                      borderColor: 'var(--accent)',
+                      color: 'var(--accent)',
+                    }}
+                  >
+                    {copiedShare ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedShare ? 'Copied Link' : 'Copy Link'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Export transcript */}
+              {currentConversation && (
+                <div
+                  className="p-4 rounded-xl border space-y-3"
+                  style={{
+                    backgroundColor: 'var(--bg-base)',
+                    borderColor: 'var(--border-subtle)',
+                  }}
+                >
+                  <div className="font-bold text-xs" style={{ color: 'var(--text-primary)' }}>
+                    Export Current Chat: &ldquo;{currentConversation.title}&rdquo;
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCopyTranscript}
+                      className="px-3 py-1.5 rounded-md border text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
+                      style={{
+                        backgroundColor: 'var(--bg-card)',
+                        borderColor: 'var(--border-base)',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      {copiedTranscript ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedTranscript ? 'Copied' : 'Copy Text'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadMarkdown}
+                      className="px-3 py-1.5 rounded-md border text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
+                      style={{
+                        backgroundColor: 'var(--bg-card)',
+                        borderColor: 'var(--border-base)',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download .MD</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -247,125 +467,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   style={{ accentColor: 'var(--accent)' }}
                 />
               </div>
-
-              {/* Optional client API key for static GitHub Pages */}
-              <div
-                className="p-3.5 rounded-lg border space-y-2"
-                style={{
-                  backgroundColor: 'var(--bg-base)',
-                  borderColor: 'var(--border-subtle)',
-                }}
-              >
-                <div>
-                  <div className="font-bold text-xs flex items-center justify-between" style={{ color: 'var(--text-primary)' }}>
-                    <span>Static / GitHub Pages API Key</span>
-                    <span className="text-[10px] font-mono opacity-60">Optional</span>
-                  </div>
-                  <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    On Cloud Run or full-stack dev, the secure backend server handles all requests automatically. If you deploy statically to GitHub Pages, you can supply your free Gemini key here so ERROREN responds directly in the browser.
-                  </div>
-                </div>
-                <input
-                  type="password"
-                  value={localSettings.clientApiKey || ''}
-                  onChange={e => setLocalSettings({ ...localSettings, clientApiKey: e.target.value.trim() })}
-                  placeholder="AIzaSy... (Only needed if hosting purely on GitHub Pages)"
-                  className="w-full p-2.5 rounded-md border text-xs font-mono outline-none transition-colors"
-                  style={{
-                    backgroundColor: 'var(--bg-card)',
-                    borderColor: 'var(--border-base)',
-                    color: 'var(--text-primary)',
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'data' && (
-            <div className="space-y-5">
-              {/* Keyboard Shortcuts */}
-              <div>
-                <label className="flex items-center gap-2 font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-primary)' }}>
-                  <Command className="w-3.5 h-3.5 text-zinc-400" />
-                  Keyboard Operations
-                </label>
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  <div
-                    className="p-2.5 rounded-md border flex justify-between items-center"
-                    style={{
-                      backgroundColor: 'var(--bg-base)',
-                      borderColor: 'var(--border-subtle)',
-                    }}
-                  >
-                    <span style={{ color: 'var(--text-muted)' }}>Send Message</span>
-                    <kbd
-                      className="px-2 py-0.5 rounded font-mono text-[10px] border"
-                      style={{
-                        backgroundColor: 'var(--bg-card)',
-                        borderColor: 'var(--border-base)',
-                        color: 'var(--accent)',
-                      }}
-                    >
-                      Enter
-                    </kbd>
-                  </div>
-                  <div
-                    className="p-2.5 rounded-md border flex justify-between items-center"
-                    style={{
-                      backgroundColor: 'var(--bg-base)',
-                      borderColor: 'var(--border-subtle)',
-                    }}
-                  >
-                    <span style={{ color: 'var(--text-muted)' }}>New Line</span>
-                    <kbd
-                      className="px-2 py-0.5 rounded font-mono text-[10px] border"
-                      style={{
-                        backgroundColor: 'var(--bg-card)',
-                        borderColor: 'var(--border-base)',
-                        color: 'var(--text-primary)',
-                      }}
-                    >
-                      Shift+Enter
-                    </kbd>
-                  </div>
-                </div>
-              </div>
-
-              {/* Export & Purge */}
-              <div className="space-y-3 pt-3 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
-                <label className="font-bold uppercase tracking-wider block" style={{ color: 'var(--text-primary)' }}>
-                  Session Storage &amp; Backup
-                </label>
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <button
-                    type="button"
-                    onClick={handleExportMarkdown}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-md border text-xs transition-colors cursor-pointer"
-                    style={{
-                      backgroundColor: 'var(--bg-base)',
-                      borderColor: 'var(--border-base)',
-                      color: 'var(--text-primary)',
-                    }}
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Export Active Chat (.md)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirm('Are you sure you want to clear all conversations? This action cannot be undone.')) {
-                        onClearAllChats();
-                        onClose();
-                      }
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-md border text-xs text-rose-400 border-rose-900/40 hover:border-rose-500 bg-rose-950/20 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Clear All Conversations</span>
-                  </button>
-                </div>
-              </div>
             </div>
           )}
         </div>
@@ -400,3 +501,4 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     </div>
   );
 };
+

@@ -13,9 +13,25 @@ export interface ChatMessage {
   content: string;
   timestamp: number;
   attachment?: MessageAttachment;
+  generatedImage?: {
+    url: string;
+    prompt: string;
+    revisedPrompt?: string;
+    aspectRatio?: string;
+  };
   isStreaming?: boolean;
   error?: boolean;
   feedback?: 'like' | 'dislike' | null;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  systemPrompt?: string;
+  color?: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Conversation {
@@ -25,6 +41,7 @@ export interface Conversation {
   updatedAt: number;
   messages: ChatMessage[];
   pinned?: boolean;
+  projectId?: string;
 }
 
 export interface AppSettings {
@@ -40,6 +57,7 @@ export interface UserProfile {
   id: string;
   name: string;
   email: string;
+  bio?: string;
   avatar?: string;
   savedAt: number;
 }

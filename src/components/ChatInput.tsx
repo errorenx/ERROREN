@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, ChangeEvent, KeyboardEvent } from 'react';
-import { ArrowUp, Paperclip, Square, X } from 'lucide-react';
+import { ArrowUp, Paperclip, Square, X, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { MessageAttachment } from '../types';
 
 interface ChatInputProps {
@@ -138,7 +138,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask anything... (English ya Roman Urdu mein likhein)"
+          placeholder="Ask anything..."
           rows={1}
           className="w-full bg-transparent px-4 pt-3.5 pb-2 text-sm resize-none focus:outline-none max-h-[200px] leading-relaxed transition-all"
           style={{
@@ -151,7 +151,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           className="flex items-center justify-between px-3 pb-2.5 pt-1 text-xs"
           style={{ color: 'var(--text-muted)' }}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {/* File Upload Button */}
             <input
               ref={fileInputRef}
@@ -167,11 +167,35 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               style={{
                 color: 'var(--text-secondary)',
               }}
-              title="Attach image"
-              aria-label="Attach image"
+              title="Attach photo to chat or edit"
+              aria-label="Attach photo"
             >
               <Paperclip className="w-4 h-4" />
               <span className="text-[11px] hidden sm:inline">Attach</span>
+            </button>
+
+            {/* Quick Photo Create / Edit Prompt Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (attachment) {
+                  setText(prev => (prev ? prev : 'Edit this image: make it cyberpunk neon style'));
+                } else {
+                  setText(prev => (prev ? prev : 'Generate an image of '));
+                }
+                textareaRef.current?.focus();
+              }}
+              className="p-1.5 rounded-md hover:opacity-100 opacity-75 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-mono"
+              style={{
+                color: 'var(--accent)',
+                backgroundColor: 'var(--accent-subtle)',
+              }}
+              title="Create or edit photo directly in chat"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="text-[11px] font-medium hidden sm:inline">
+                {attachment ? 'Edit Photo' : 'Create Photo'}
+              </span>
             </button>
           </div>
 
@@ -209,14 +233,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             )}
           </div>
         </div>
-      </div>
-
-      <div
-        className="mt-2 flex justify-between items-center text-[10px] font-mono select-none px-1 opacity-50"
-        style={{ color: 'var(--text-muted)' }}
-      >
-        <span>ERROREN AI</span>
-        <span>Shift+Enter for new line</span>
       </div>
     </div>
   );

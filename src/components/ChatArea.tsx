@@ -244,242 +244,36 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
         </div>
 
-        {/* Center/Right Section: 10 Separate Colors + Dark/Light Mode Switcher */}
-        <div className="flex items-center gap-2 sm:gap-3 text-xs font-mono">
-          {/* Quick 10 Colors Swatches Dock (Desktop & Tablet) */}
-          <div
-            className="hidden md:flex items-center gap-1 px-2.5 py-1 rounded-full border shadow-2xs relative"
-            style={{
-              backgroundColor: 'var(--bg-card)',
-              borderColor: 'var(--border-base)',
-            }}
-          >
-            <span className="text-[10px] uppercase font-bold tracking-wider mr-1 opacity-60" style={{ color: 'var(--text-muted)' }}>
-              10 Colors:
-            </span>
-
-            <div className="flex items-center gap-1">
-              {COLOR_LIST.map((color, idx) => {
-                const isSelected = currentColorId === color.id;
-                return (
-                  <button
-                    key={color.id}
-                    type="button"
-                    onClick={() => handleColorChange(color.id)}
-                    onMouseEnter={() => setHoveredColor(color.name)}
-                    onMouseLeave={() => setHoveredColor(null)}
-                    className="relative cursor-pointer transition-transform duration-150 hover:scale-125 focus:outline-hidden"
-                    title={`${color.name} (#${idx + 1})`}
-                    aria-label={`Apply ${color.name}`}
-                  >
-                    <div
-                      className={`w-4.5 h-4.5 rounded-full transition-all flex items-center justify-center ${
-                        isSelected
-                          ? 'ring-2 ring-white scale-110 shadow-sm'
-                          : 'opacity-70 hover:opacity-100'
-                      }`}
-                      style={{
-                        backgroundColor: color.preview,
-                        boxShadow: isSelected ? `0 0 8px ${color.preview}` : 'none',
-                      }}
-                    >
-                      {isSelected && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-white shadow-xs" />
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Hover Tooltip Tag */}
-            {hoveredColor && (
-              <div
-                className="absolute -bottom-6 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase whitespace-nowrap shadow-md pointer-events-none z-30"
-                style={{
-                  backgroundColor: 'var(--bg-card)',
-                  borderColor: 'var(--border-base)',
-                  borderWidth: '1px',
-                  color: 'var(--accent)',
-                }}
-              >
-                {hoveredColor}
-              </div>
-            )}
-          </div>
-
-          {/* Mobile Colors Dropdown Trigger */}
-          <div className="relative md:hidden">
-            <button
-              type="button"
-              onClick={() => setIsMobilePaletteOpen(prev => !prev)}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-full border text-[10px] font-bold cursor-pointer"
-              style={{
-                backgroundColor: 'var(--bg-card)',
-                borderColor: 'var(--border-base)',
-                color: 'var(--text-primary)',
-              }}
-              title="10 Colors"
-            >
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{
-                  backgroundColor: activeColorDef.preview,
-                  boxShadow: `0 0 6px ${activeColorDef.preview}`,
-                }}
-              />
-              <span className="hidden xs:inline">{activeColorDef.name.split(' ')[0]}</span>
-              <ChevronDown className="w-3 h-3 opacity-60" />
-            </button>
-
-            {isMobilePaletteOpen && (
-              <div
-                className="absolute right-0 top-full mt-2 p-2.5 rounded-xl border shadow-xl z-50 grid grid-cols-5 gap-2 w-48"
-                style={{
-                  backgroundColor: 'var(--bg-surface)',
-                  borderColor: 'var(--border-base)',
-                }}
-              >
-                <div className="col-span-5 text-[9px] font-bold uppercase tracking-wider text-center opacity-60" style={{ color: 'var(--text-muted)' }}>
-                  Select 1 of 10 Colors
-                </div>
-                {COLOR_LIST.map(c => {
-                  const isSelected = currentColorId === c.id;
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => {
-                        handleColorChange(c.id);
-                        setIsMobilePaletteOpen(false);
-                      }}
-                      className="p-1 rounded-md flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
-                    >
-                      <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                          isSelected ? 'ring-2 ring-white scale-110 shadow-md' : 'opacity-80'
-                        }`}
-                        style={{ backgroundColor: c.preview }}
-                      >
-                        {isSelected && <Check className="w-3 h-3 text-white" />}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Independent Dark Mode / Light Mode Segmented Toggle Switch */}
-          <div
-            className="flex items-center p-0.5 rounded-full border shadow-2xs"
-            style={{
-              backgroundColor: 'var(--bg-card)',
-              borderColor: 'var(--border-base)',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => handleModeChange('dark')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                safeMode === 'dark' ? 'shadow-xs' : 'opacity-60 hover:opacity-100'
-              }`}
-              style={{
-                backgroundColor: safeMode === 'dark' ? 'var(--accent)' : 'transparent',
-                color: safeMode === 'dark' ? 'var(--accent-text)' : 'var(--text-secondary)',
-              }}
-              title="Switch to Dark Mode"
-            >
-              <Moon className="w-3 h-3" />
-              <span className="hidden sm:inline">Dark</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleModeChange('light')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                safeMode === 'light' ? 'shadow-xs' : 'opacity-60 hover:opacity-100'
-              }`}
-              style={{
-                backgroundColor: safeMode === 'light' ? 'var(--accent)' : 'transparent',
-                color: safeMode === 'light' ? 'var(--accent-text)' : 'var(--text-secondary)',
-              }}
-              title="Switch to Light Mode"
-            >
-              <Sun className="w-3 h-3 text-amber-500" />
-              <span className="hidden sm:inline">Light</span>
-            </button>
-          </div>
-
-          {/* User Account Trigger */}
+        {/* Right Section: Clean Quick Action (New Chat & Settings) */}
+        <div className="flex items-center gap-2 text-xs font-mono">
           <button
-            onClick={onOpenAccount}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border transition-all cursor-pointer opacity-90 hover:opacity-100"
+            onClick={onNewChat}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer opacity-90 hover:opacity-100 shadow-2xs"
             style={{
               backgroundColor: 'var(--bg-card)',
               borderColor: 'var(--border-subtle)',
               color: 'var(--text-primary)',
             }}
-            title="User Profile & Settings"
+            title="Start fresh conversation"
           >
-            <div
-              className="w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold text-[8px]"
-              style={{
-                backgroundColor: 'var(--accent)',
-                color: 'var(--accent-text)',
-              }}
-            >
-              {currentProfile?.name ? currentProfile.name.charAt(0).toUpperCase() : <User className="w-2.5 h-2.5" />}
-            </div>
-            <span className="text-[10px] font-medium hidden sm:inline truncate max-w-[80px]">
-              {currentProfile?.name || 'Account'}
-            </span>
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">New Thread</span>
           </button>
 
-          {/* New Chat & Share Actions */}
-          <div className="flex items-center gap-1.5 border-l pl-2" style={{ borderColor: 'var(--border-subtle)' }}>
-            <button
-              onClick={onNewChat}
-              className="flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] font-semibold uppercase tracking-wider transition-all cursor-pointer opacity-90 hover:opacity-100"
-              style={{
-                backgroundColor: 'var(--bg-card)',
-                borderColor: 'var(--border-subtle)',
-                color: 'var(--text-primary)',
-              }}
-              title="Start fresh conversation"
-            >
-              <Plus className="w-3 h-3" />
-              <span className="hidden lg:inline">New</span>
-            </button>
-
-            <button
-              onClick={handleShare}
-              className="p-1 rounded-md border transition-all cursor-pointer opacity-80 hover:opacity-100"
-              style={{
-                backgroundColor: 'var(--bg-card)',
-                borderColor: 'var(--border-subtle)',
-                color: 'var(--text-secondary)',
-              }}
-              title="Share or copy conversation"
-              aria-label="Share or copy conversation"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-            </button>
-
-            <button
-              onClick={onOpenSettings}
-              className="p-1 rounded-md border transition-all cursor-pointer opacity-80 hover:opacity-100"
-              style={{
-                backgroundColor: 'var(--bg-card)',
-                borderColor: 'var(--border-subtle)',
-                color: 'var(--text-secondary)',
-              }}
-              title="Open Settings"
-              aria-label="Open Settings"
-            >
-              <Sliders className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <button
+            onClick={onOpenSettings}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer opacity-90 hover:opacity-100 shadow-2xs"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              borderColor: 'var(--border-subtle)',
+              color: 'var(--text-primary)',
+            }}
+            title="Settings (Theme, Dark/Light Mode, Profile, Share)"
+            aria-label="Settings"
+          >
+            <Sliders className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+            <span className="hidden sm:inline">Settings</span>
+          </button>
         </div>
       </header>
 

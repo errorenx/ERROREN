@@ -15,12 +15,17 @@ import {
   generateChatTitle,
   loadLocalProfile,
   saveLocalProfile,
+  loadProjects,
+  saveProjects,
+  loadActiveProjectId,
+  saveActiveProjectId,
 } from './utils/storage';
-import { Conversation, ChatMessage, MessageAttachment, AppSettings, UserProfile } from './types';
+import { Conversation, ChatMessage, MessageAttachment, AppSettings, UserProfile, Project } from './types';
 import { Sidebar } from './components/Sidebar';
 import { ChatArea } from './components/ChatArea';
 import { SettingsModal } from './components/SettingsModal';
 import { AccountModal } from './components/AccountModal';
+import { ProjectModal } from './components/ProjectModal';
 import {
   auth,
   logOut,
@@ -46,6 +51,10 @@ export default function App() {
   const [conversations, setConversations] = useState<Conversation[]>(() => loadConversations());
   const [activeId, setActiveId] = useState<string>(() => loadActiveChatId());
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
+  const [projects, setProjects] = useState<Project[]>(() => loadProjects());
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(() => loadActiveProjectId());
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState<boolean>(false);
+  const [authMode, setAuthMode] = useState<'register' | 'login'>('register');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
@@ -72,9 +81,11 @@ export default function App() {
 
   // Listen to Firebase Auth state
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async user => {
-      setCurrentUser(user);
-      if (user) {
+    if (!auth) return;
+    try {
+      const unsubscribe = onAuthStateChanged(auth, async user => {
+        setCurrentUser(user);
+        if (user) {
         // If logged in via Google and no local profile name, populate local profile
         if (!localProfile) {
           const profile: UserProfile = {
@@ -126,9 +137,14 @@ export default function App() {
           console.error('Failed to sync cloud conversations:', err);
         }
       }
+    }, err => {
+      console.warn('onAuthStateChanged listener warning:', err);
     });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (err) {
+      console.warn('onAuthStateChanged setup notice:', err);
+    }
   }, []);
 
   // Sync active chat ID & conversations with localStorage
@@ -217,17 +233,74 @@ export default function App() {
     }
   };
 
+  const handleSelectProject = (projectId: string | null) => {
+    setActiveProjectId(projectId);
+    saveActiveProjectId(projectId);
+
+    // If active conversation doesn't belong to this project, select or create one
+    if (projectId) {
+      const projectConvs = conversations.filter(c => c.projectId === projectId);
+      if (projectConvs.length > 0) {
+        setActiveId(projectConvs[0].id);
+      } else {
+        const proj = projects.find(p => p.id === projectId);
+        const newChat: Conversation = {
+          id: `conv_${Date.now()}`,
+          title: `${proj?.name || 'Project'} - Chat 1`,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          messages: [],
+          projectId: projectId,
+        };
+        setConversations(prev => [newChat, ...prev]);
+        setActiveId(newChat.id);
+      }
+    }
+  };
+
+  const handleCreateProject = (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newProject: Project = {
+      ...projectData,
+      id: `proj_${Date.now()}`,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    const updated = [newProject, ...projects];
+    setProjects(updated);
+    saveProjects(updated);
+    handleSelectProject(newProject.id);
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    const updated = projects.filter(p => p.id !== projectId);
+    setProjects(updated);
+    saveProjects(updated);
+    if (activeProjectId === projectId) {
+      setActiveProjectId(null);
+      saveActiveProjectId(null);
+    }
+  };
+
+  const handleOpenAccountWithMode = (mode: 'register' | 'login') => {
+    setAuthMode(mode);
+    setIsAccountOpen(true);
+  };
+
   const handleNewChat = () => {
     if (activeConversation.messages.length === 0) {
       return;
     }
 
+    const currentProj = projects.find(p => p.id === activeProjectId);
     const newChat: Conversation = {
       id: `conv_${Date.now()}`,
-      title: 'New chat',
+      title: currentProj
+        ? `${currentProj.name} - Chat ${conversations.filter(c => c.projectId === activeProjectId).length + 1}`
+        : 'New chat',
       createdAt: Date.now(),
       updatedAt: Date.now(),
       messages: [],
+      projectId: activeProjectId || undefined,
     };
 
     setConversations(prev => [newChat, ...prev]);
@@ -326,6 +399,12 @@ export default function App() {
       })
     );
 
+    const currentProj = projects.find(p => p.id === activeProjectId);
+    const combinedSystemPrompt = [
+      currentProj?.systemPrompt ? `[Active Project: ${currentProj.name}]\n${currentProj.systemPrompt}` : undefined,
+      settings.systemPrompt,
+    ].filter(Boolean).join('\n\n');
+
     try {
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
@@ -334,7 +413,7 @@ export default function App() {
         body: JSON.stringify({
           messages: historyForApi,
           image: attachment ? { data: attachment.data, mimeType: attachment.mimeType } : undefined,
-          systemPrompt: settings.systemPrompt || undefined,
+          systemPrompt: combinedSystemPrompt || undefined,
         }),
       });
 
@@ -520,6 +599,69 @@ export default function App() {
     }
   };
 
+  const isImageRequest = (promptText: string, hasAttachment: boolean): boolean => {
+    const p = promptText.toLowerCase().trim();
+    if (
+      p.startsWith('/image') ||
+      p.startsWith('/draw') ||
+      p.startsWith('/photo') ||
+      p.startsWith('/generate') ||
+      p.startsWith('/edit')
+    ) {
+      return true;
+    }
+    if (
+      p.includes('generate image') ||
+      p.includes('generate photo') ||
+      p.includes('generate an image') ||
+      p.includes('create an image') ||
+      p.includes('create a photo') ||
+      p.includes('create photo') ||
+      p.includes('create image') ||
+      p.includes('draw an image') ||
+      p.includes('draw a picture') ||
+      p.includes('make an image') ||
+      p.includes('make a photo') ||
+      p.includes('draw me') ||
+      p.includes('paint an image')
+    ) {
+      return true;
+    }
+    // Roman Urdu & Urdu patterns:
+    if (
+      p.includes('photo bana') ||
+      p.includes('photo bna') ||
+      p.includes('image bna') ||
+      p.includes('image bana') ||
+      p.includes('tasveer bna') ||
+      p.includes('tasweer bna') ||
+      p.includes('tasveer bana') ||
+      p.includes('photo chay') ||
+      p.includes('image chay') ||
+      p.includes('photo chahiye') ||
+      p.includes('image chahiye') ||
+      p.includes('photo create') ||
+      p.includes('image create') ||
+      p.includes('photo bnwa') ||
+      p.includes('photo bnay') ||
+      p.includes('image bnay')
+    ) {
+      return true;
+    }
+    if (
+      hasAttachment &&
+      (p.includes('edit') ||
+        p.includes('modify') ||
+        p.includes('style') ||
+        p.includes('change') ||
+        p.includes('make it') ||
+        p.includes('filter'))
+    ) {
+      return true;
+    }
+    return false;
+  };
+
   const handleSendMessage = async (text: string, attachment?: MessageAttachment) => {
     if (isGenerating) return;
 
@@ -546,6 +688,7 @@ export default function App() {
       title: newTitle,
       updatedAt: Date.now(),
       messages: updatedMessages,
+      projectId: activeProjectId || currentConv.projectId,
     };
 
     setConversations(prev =>
@@ -554,6 +697,98 @@ export default function App() {
 
     if (currentUser) {
       saveConversationToCloud(currentUser.uid, updatedConv).catch(console.error);
+    }
+
+    // In-chat ChatGPT-style image generation/editing
+    if (isImageRequest(text, !!attachment)) {
+      setIsGenerating(true);
+      const assistantMsgId = `asst_${Date.now()}`;
+      const placeholderAssistantMsg: ChatMessage = {
+        id: assistantMsgId,
+        role: 'assistant',
+        content: attachment
+          ? `Editing photo based on prompt: "${text}"...`
+          : `Creating and generating photo for: "${text}"...`,
+        timestamp: Date.now(),
+        isStreaming: true,
+      };
+
+      setConversations(prev =>
+        prev.map(c =>
+          c.id === currentConv.id
+            ? {
+                ...updatedConv,
+                messages: [...updatedMessages, placeholderAssistantMsg],
+              }
+            : c
+        )
+      );
+
+      try {
+        const response = await fetch('/api/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: text,
+            image: attachment ? { data: attachment.data, mimeType: attachment.mimeType } : undefined,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Image API status ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.url) {
+          setConversations(prev =>
+            prev.map(c => {
+              if (c.id !== currentConv.id) return c;
+              const finishedConv: Conversation = {
+                ...c,
+                updatedAt: Date.now(),
+                messages: c.messages.map(m =>
+                  m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        content: data.revisedPrompt
+                          ? `Here is your generated photo:\n\n*${data.revisedPrompt}*`
+                          : `Here is your requested photo:`,
+                        generatedImage: {
+                          url: data.url,
+                          prompt: text,
+                          revisedPrompt: data.revisedPrompt,
+                          aspectRatio: data.aspectRatio || '1:1',
+                        },
+                        isStreaming: false,
+                      }
+                    : m
+                ),
+              };
+              if (currentUser) {
+                saveConversationToCloud(currentUser.uid, finishedConv).catch(console.error);
+              }
+              return finishedConv;
+            })
+          );
+          return;
+        } else {
+          throw new Error(data.error || 'No image returned');
+        }
+      } catch (imgErr: any) {
+        console.warn('In-chat image generation fallback notice:', imgErr);
+        // Fall back to standard streaming text model
+        setConversations(prev =>
+          prev.map(c => {
+            if (c.id !== currentConv.id) return c;
+            return {
+              ...c,
+              messages: c.messages.filter(m => m.id !== assistantMsgId),
+            };
+          })
+        );
+      } finally {
+        setIsGenerating(false);
+      }
     }
 
     const historyForApi = updatedMessages.map(m => ({
@@ -670,7 +905,7 @@ export default function App() {
         onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         currentProfile={localProfile}
-        onOpenAccount={() => setIsAccountOpen(true)}
+        onOpenAccount={() => handleOpenAccountWithMode('register')}
         onLogoutProfile={handleLogoutProfile}
         currentThemeMode={settings.themeMode}
         currentColorId={settings.colorId}
@@ -678,6 +913,12 @@ export default function App() {
         onSelectColorId={handleSelectColorId}
         currentThemeId={settings.themeId}
         onSelectTheme={handleSelectTheme}
+        projects={projects}
+        activeProjectId={activeProjectId}
+        onSelectProject={handleSelectProject}
+        onOpenCreateProject={() => setIsProjectModalOpen(true)}
+        onDeleteProject={handleDeleteProject}
+        onOpenAccountWithMode={handleOpenAccountWithMode}
       />
 
       {/* Main Chat View */}
@@ -695,7 +936,7 @@ export default function App() {
           onNewChat={handleNewChat}
           onOpenSettings={() => setIsSettingsOpen(true)}
           currentProfile={localProfile}
-          onOpenAccount={() => setIsAccountOpen(true)}
+          onOpenAccount={() => handleOpenAccountWithMode('register')}
           currentThemeMode={settings.themeMode}
           currentColorId={settings.colorId}
           onSelectThemeMode={handleSelectThemeMode}
@@ -713,14 +954,25 @@ export default function App() {
         onSaveSettings={newSettings => setSettings(newSettings)}
         onClearAllChats={handleClearAllChats}
         currentConversation={activeConversation}
+        currentProfile={localProfile}
+        onLogoutProfile={handleLogoutProfile}
+        onOpenAccount={() => handleOpenAccountWithMode('register')}
       />
 
-      {/* Account & Profile Modal with Instant Save */}
+      {/* Account & Profile Modal with Login/Register Modes */}
       <AccountModal
         isOpen={isAccountOpen}
         onClose={() => setIsAccountOpen(false)}
         currentProfile={localProfile}
         onSaveProfile={handleSaveProfile}
+        initialMode={authMode}
+      />
+
+      {/* Project Creation Modal */}
+      <ProjectModal
+        isOpen={isProjectModalOpen}
+        onClose={() => setIsProjectModalOpen(false)}
+        onCreateProject={handleCreateProject}
       />
     </div>
   );

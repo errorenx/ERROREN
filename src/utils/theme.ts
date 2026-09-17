@@ -10,7 +10,10 @@ export type ColorId =
   | 'orange'   // 7. Sunset Orange
   | 'lime'     // 8. Cyber Lime
   | 'pink'     // 9. Fuchsia Pink
-  | 'teal';    // 10. Obsidian Teal
+  | 'teal'     // 10. Obsidian Teal
+  | 'black'    // 11. Stealth Black / Pitch Black
+  | 'white'    // 12. Minimalist Pure White
+  | 'rainbow'; // 13. Rainbow Spectrum / Chromatic Neon
 
 export interface ColorDefinition {
   id: ColorId;
@@ -254,6 +257,72 @@ export const COLOR_PALETTES: Record<ColorId, ColorDefinition> = {
       accentText: '#ffffff',
       borderFocus: '#0d9488',
       glow: 'rgba(13, 148, 136, 0.35)',
+    },
+  },
+  black: {
+    id: 'black',
+    name: 'Stealth Black',
+    preview: '#09090b',
+    description: 'Ultra-sleek monochrome pitch black obsidian',
+    dark: {
+      accent: '#e2e8f0',
+      accentHover: '#ffffff',
+      accentSubtle: 'rgba(255, 255, 255, 0.12)',
+      accentText: '#09090b',
+      borderFocus: '#94a3b8',
+      glow: 'rgba(255, 255, 255, 0.3)',
+    },
+    light: {
+      accent: '#09090b',
+      accentHover: '#27272a',
+      accentSubtle: 'rgba(9, 9, 11, 0.10)',
+      accentText: '#ffffff',
+      borderFocus: '#09090b',
+      glow: 'rgba(9, 9, 11, 0.3)',
+    },
+  },
+  white: {
+    id: 'white',
+    name: 'Pure White',
+    preview: '#ffffff',
+    description: 'Clean minimalist architectural pure snow white',
+    dark: {
+      accent: '#ffffff',
+      accentHover: '#f8fafc',
+      accentSubtle: 'rgba(255, 255, 255, 0.16)',
+      accentText: '#09090b',
+      borderFocus: '#ffffff',
+      glow: 'rgba(255, 255, 255, 0.5)',
+    },
+    light: {
+      accent: '#1e293b',
+      accentHover: '#334155',
+      accentSubtle: 'rgba(30, 41, 59, 0.08)',
+      accentText: '#ffffff',
+      borderFocus: '#1e293b',
+      glow: 'rgba(30, 41, 59, 0.25)',
+    },
+  },
+  rainbow: {
+    id: 'rainbow',
+    name: 'Rainbow Spectrum',
+    preview: 'linear-gradient(135deg, #ff007a 0%, #7928ca 35%, #0070f3 70%, #00dfd8 100%)',
+    description: 'Dynamic chromatic iridescent neon rainbow',
+    dark: {
+      accent: '#ff007a',
+      accentHover: '#00dfd8',
+      accentSubtle: 'rgba(255, 0, 122, 0.22)',
+      accentText: '#ffffff',
+      borderFocus: '#00dfd8',
+      glow: 'rgba(255, 0, 122, 0.6)',
+    },
+    light: {
+      accent: '#7928ca',
+      accentHover: '#ff007a',
+      accentSubtle: 'rgba(121, 40, 202, 0.15)',
+      accentText: '#ffffff',
+      borderFocus: '#7928ca',
+      glow: 'rgba(121, 40, 202, 0.4)',
     },
   },
 };

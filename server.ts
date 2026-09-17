@@ -290,6 +290,119 @@ app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// Image Generation & Editing API Endpoint
+app.post('/api/generate-image', async (req: Request, res: Response): Promise<void> => {
+  const { prompt, image, aspectRatio } = req.body;
+
+  if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+    res.status(400).json({ error: 'A prompt describing the image to generate or edit is required.' });
+    return;
+  }
+
+  const cleanPrompt = prompt.trim();
+  console.log(`[ERROREN Image API] Request received for prompt: "${cleanPrompt}", hasImage: ${!!image?.data}`);
+
+  // 1. First attempt with Gemini Nano/Flash image generation model if key is configured
+  try {
+    const ai = getGeminiClient();
+    const parts: any[] = [];
+
+    if (image?.data) {
+      parts.push({
+        inlineData: {
+          data: image.data,
+          mimeType: image.mimeType || 'image/png',
+        },
+      });
+      parts.push({
+        text: cleanPrompt || 'Edit and transform this image according to user instructions.',
+      });
+    } else {
+      parts.push({ text: cleanPrompt });
+    }
+
+    // Try Gemini image model
+    const geminiImgRes = await ai.models.generateContent({
+      model: 'gemini-3.1-flash-lite-image',
+      contents: { parts } as any,
+      config: {
+        imageConfig: {
+          aspectRatio: (aspectRatio as any) || '1:1',
+        },
+      },
+    });
+
+    for (const part of geminiImgRes.candidates?.[0]?.content?.parts || []) {
+      if ((part as any).inlineData) {
+        const mime = (part as any).inlineData.mimeType || 'image/png';
+        const b64 = (part as any).inlineData.data;
+        console.log('[ERROREN Image API] Successfully generated with Gemini Imagen model!');
+        res.json({
+          imageUrl: `data:${mime};base64,${b64}`,
+          prompt: cleanPrompt,
+          source: 'gemini',
+        });
+        return;
+      }
+    }
+  } catch (geminiErr: any) {
+    console.warn('[ERROREN Image API] Gemini direct image model unavailable or error:', geminiErr?.message || geminiErr);
+  }
+
+  // 2. High-Fidelity Neural Fallback Pipeline
+  try {
+    const safeAspect = aspectRatio || '1:1';
+    let width = 1024;
+    let height = 1024;
+    if (safeAspect === '16:9') {
+      width = 1280;
+      height = 720;
+    } else if (safeAspect === '9:16') {
+      width = 720;
+      height = 1280;
+    } else if (safeAspect === '4:3') {
+      width = 1024;
+      height = 768;
+    }
+
+    const seed = Math.floor(Math.random() * 900000) + 100000;
+    const encodedPrompt = encodeURIComponent(cleanPrompt);
+    const neuralUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true`;
+
+    console.log(`[ERROREN Image API] Generating via Neural Engine: ${neuralUrl}`);
+
+    // Try fetching and converting to base64 for persistent, self-contained rendering
+    try {
+      const response = await fetch(neuralUrl);
+      if (response.ok) {
+        const arrayBuf = await response.arrayBuffer();
+        const base64Str = Buffer.from(arrayBuf).toString('base64');
+        const mimeType = response.headers.get('content-type') || 'image/jpeg';
+        res.json({
+          imageUrl: `data:${mimeType};base64,${base64Str}`,
+          prompt: cleanPrompt,
+          source: 'neural',
+        });
+        return;
+      }
+    } catch (fetchErr) {
+      console.warn('[ERROREN Image API] Direct fetch buffer failed, falling back to URL:', fetchErr);
+    }
+
+    // Direct URL fallback if fetch times out
+    res.json({
+      imageUrl: neuralUrl,
+      prompt: cleanPrompt,
+      source: 'neural_url',
+    });
+  } catch (finalErr: any) {
+    console.error('[ERROREN Image API] All image generation methods failed:', finalErr);
+    res.status(500).json({
+      error: finalErr?.message || 'Could not generate image. Please try a different prompt.',
+    });
+  }
+});
+
 async function startServer() {
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {

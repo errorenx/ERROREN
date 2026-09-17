@@ -185,10 +185,10 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
             </div>
             <div>
               <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
-                2. 10 Separate Colors
+                2. Signature Color Palette
               </h3>
               <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                Select any color to apply across Dark or Light Mode
+                Select any theme color to apply across Dark or Light Mode
               </p>
             </div>
           </div>
@@ -203,17 +203,18 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-          {COLOR_LIST.map((color, index) => {
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+          {COLOR_LIST.map(color => {
             const isSelected = currentColorId === color.id;
             const accentHex = currentMode === 'dark' ? color.dark.accent : color.light.accent;
+            const isGradient = color.preview.startsWith('linear-gradient');
 
             return (
               <button
                 key={color.id}
                 type="button"
                 onClick={() => handleColorChange(color.id)}
-                className={`p-3 rounded-xl border flex flex-col items-center text-center gap-2 transition-all cursor-pointer relative group ${
+                className={`p-3 rounded-xl border flex flex-col items-center text-center gap-2.5 transition-all cursor-pointer relative group ${
                   isSelected
                     ? 'ring-2 scale-[1.02] shadow-md'
                     : 'opacity-85 hover:opacity-100 hover:scale-[1.01]'
@@ -223,11 +224,8 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
                   borderColor: isSelected ? accentHex : 'var(--border-subtle)',
                 }}
               >
-                {/* Number & Check Indicator */}
-                <div className="w-full flex items-center justify-between px-0.5">
-                  <span className="text-[9px] font-mono opacity-50" style={{ color: 'var(--text-muted)' }}>
-                    #{index + 1}
-                  </span>
+                {/* Active Check Indicator */}
+                <div className="w-full flex items-center justify-end px-0.5 h-4">
                   {isSelected && (
                     <span
                       className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] shadow-xs"
@@ -240,10 +238,11 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
 
                 {/* Color Swatch Circle with Glow */}
                 <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm"
+                  className="w-10 h-10 rounded-full flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm border border-white/10"
                   style={{
-                    backgroundColor: color.preview,
-                    boxShadow: isSelected ? `0 0 16px ${color.preview}88` : `0 0 8px ${color.preview}44`,
+                    background: isGradient ? color.preview : undefined,
+                    backgroundColor: isGradient ? undefined : color.preview,
+                    boxShadow: isSelected ? '0 0 16px rgba(255, 255, 255, 0.25)' : 'none',
                   }}
                 />
 
@@ -251,9 +250,6 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
                 <div className="w-full">
                   <div className="text-[11px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>
                     {color.name}
-                  </div>
-                  <div className="text-[9px] font-mono mt-0.5 opacity-60 truncate" style={{ color: 'var(--text-muted)' }}>
-                    {color.preview}
                   </div>
                 </div>
               </button>

@@ -1,4 +1,4 @@
-import { Conversation, AppSettings, UserProfile } from '../types';
+import { Conversation, AppSettings, UserProfile, Project } from '../types';
 import {
   DEFAULT_COLOR_ID,
   DEFAULT_THEME_ID,
@@ -147,3 +147,47 @@ export function generateChatTitle(firstMessage: string): string {
   if (clean.length <= 32) return clean;
   return clean.slice(0, 30) + '...';
 }
+
+const STORAGE_PROJECTS_KEY = 'erroren_projects_v2';
+const STORAGE_ACTIVE_PROJECT_KEY = 'erroren_active_project_id_v2';
+
+export function loadProjects(): Project[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_PROJECTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error('Failed to load projects from localStorage', err);
+    return [];
+  }
+}
+
+export function saveProjects(projects: Project[]): void {
+  try {
+    localStorage.setItem(STORAGE_PROJECTS_KEY, JSON.stringify(projects));
+  } catch (err) {
+    console.error('Failed to save projects to localStorage', err);
+  }
+}
+
+export function loadActiveProjectId(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_ACTIVE_PROJECT_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveActiveProjectId(id: string | null): void {
+  try {
+    if (id) {
+      localStorage.setItem(STORAGE_ACTIVE_PROJECT_KEY, id);
+    } else {
+      localStorage.removeItem(STORAGE_ACTIVE_PROJECT_KEY);
+    }
+  } catch (err) {
+    console.error('Failed to save active project ID', err);
+  }
+}
+
