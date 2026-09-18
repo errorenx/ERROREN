@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, User, Check, LogIn, UserPlus, AlertCircle, Lock, Mail } from 'lucide-react';
-import { registerWithEmail, loginWithEmail } from '../lib/firebase';
+import { signUpWithEmail, loginWithEmail } from '../lib/supabase';
 import { UserProfile } from '../types';
 
 interface AccountModalProps {
@@ -71,12 +71,17 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
     try {
       if (mode === 'register') {
-        try {
-          const user = await registerWithEmail(email.trim(), password, name.trim());
+        const result = await signUpWithEmail(email.trim(), password, name.trim());
+        if (result.needsEmailConfirmation) {
+          setSuccessMessage('Account created! Please check your email inbox to confirm your account before logging in.');
+          setTimeout(() => {
+            onClose();
+          }, 2400);
+        } else if (result.user) {
           const newProfile: UserProfile = {
-            id: user.uid,
-            name: name.trim() || user.displayName || 'User',
-            email: user.email || email.trim(),
+            id: result.user.id,
+            name: name.trim() || email.split('@')[0],
+            email: email.trim(),
             savedAt: Date.now(),
           };
           onSaveProfile(newProfile);
@@ -84,50 +89,15 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           setTimeout(() => {
             onClose();
           }, 700);
-        } catch (authErr: any) {
-          console.warn('Firebase registration fallback to direct account save:', authErr);
-          // If Firebase is unavailable or offline, save profile directly
-          const localProfile: UserProfile = {
-            id: `usr_${Date.now()}`,
-            name: name.trim(),
-            email: email.trim(),
-            savedAt: Date.now(),
-          };
-          onSaveProfile(localProfile);
-          setSuccessMessage('Account created and activated!');
-          setTimeout(() => {
-            onClose();
-          }, 700);
         }
       } else {
         // Login mode
-        try {
-          const user = await loginWithEmail(email.trim(), password);
-          const loggedProfile: UserProfile = {
-            id: user.uid,
-            name: user.displayName || email.split('@')[0],
-            email: user.email || email.trim(),
-            savedAt: Date.now(),
-          };
-          onSaveProfile(loggedProfile);
-          setSuccessMessage('Logged in successfully!');
-          setTimeout(() => {
-            onClose();
-          }, 700);
-        } catch (authErr: any) {
-          console.warn('Firebase login fallback to direct login:', authErr);
-          const localProfile: UserProfile = {
-            id: `usr_${Date.now()}`,
-            name: name.trim() || email.split('@')[0],
-            email: email.trim(),
-            savedAt: Date.now(),
-          };
-          onSaveProfile(localProfile);
-          setSuccessMessage('Logged in successfully!');
-          setTimeout(() => {
-            onClose();
-          }, 700);
-        }
+        const { profile } = await loginWithEmail(email.trim(), password);
+        onSaveProfile(profile);
+        setSuccessMessage('Logged in successfully!');
+        setTimeout(() => {
+          onClose();
+        }, 700);
       }
     } catch (err: any) {
       setError(err?.message || 'Authentication error. Please check your details.');

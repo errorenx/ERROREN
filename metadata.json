@@ -1,6 +1,6 @@
 {
   "name": "ERROREN",
-  "description": "A fast and powerful AI assistant inspired by ChatGPT with Google Authentication and Cloud Firestore database backup.",
+  "description": "A fast and powerful AI assistant inspired by ChatGPT with Supabase Authentication and Supabase PostgreSQL cloud database backup.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

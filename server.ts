@@ -11,9 +11,23 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json({ limit: '25mb' }));
+
+// Production-ready CORS for Appwrite hosting & decoupled deployment
+app.use((req: Request, res: Response, next) => {
+  const origin = req.headers.origin || '*';
+  res.header('Access-Control-Allow-Origin', origin);
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
 
 // Lazy initialization for Gemini client
 function getGeminiClient(): GoogleGenAI {
@@ -42,13 +56,95 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 // Candidate models in order of priority & reliability.
-// gemini-3.1-flash-lite offers high throughput, lowest latency (~2s), and avoids high-demand queues.
-// gemini-3.5-flash and gemini-3.6-flash serve as secondary resilience layers.
+// gemini-3.8-flash is the primary recommended model.
 const CANDIDATE_MODELS = [
-  'gemini-3.1-flash-lite',
-  'gemini-3.5-flash',
-  'gemini-3.6-flash',
+  'gemini-3.8-flash',
+  'gemini-flash-latest',
 ];
+
+// Circuit breaker to avoid spamming failed Gemini requests when project quota or permissions are denied
+let geminiQuotaOrAccessBlocked = false;
+let geminiNextCheckTime = 0;
+
+function canAttemptGemini(): boolean {
+  if (!process.env.GEMINI_API_KEY) return false;
+  if (geminiQuotaOrAccessBlocked) {
+    if (Date.now() > geminiNextCheckTime) {
+      // Cooldown elapsed; allow a single test probe
+      return true;
+    }
+    return false;
+  }
+  return true;
+}
+
+function handleGeminiFailure(err: any): void {
+  const errMsg = String(err?.message || err || '');
+  const is403 = errMsg.includes('403') || errMsg.includes('PERMISSION_DENIED') || errMsg.includes('denied access');
+  const is429 = errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('quota');
+
+  if (is403 || is429) {
+    geminiQuotaOrAccessBlocked = true;
+    // 10-minute cooldown before probing again
+    geminiNextCheckTime = Date.now() + 10 * 60 * 1000;
+  }
+}
+
+async function streamNeuralFallback(
+  messages: any[],
+  systemPrompt: string | undefined,
+  res: Response,
+  isDisconnected: () => boolean
+): Promise<boolean> {
+  try {
+    const neuralMessages = [
+      {
+        role: 'system',
+        content: `${systemPrompt || DEFAULT_SYSTEM_INSTRUCTION}\n\nCRITICAL MULTI-LINGUAL DIRECTIVE:
+1. You are ERROREN AI, a world-class, highly knowledgeable synthetic intelligence.
+2. You understand and speak ALL languages with native fluency: English, Roman Urdu (e.g. "aap kaise hain", "mjy code samjhao", "kya haal hai"), Urdu (اردو), Hindi, Arabic, Spanish, etc.
+3. ALWAYS reply in the EXACT language and script that the user spoke. If the user writes in Roman Urdu, reply fluently in natural, respectful Roman Urdu. If in English, reply in English. If in Urdu script, reply in Urdu.
+4. Provide complete, accurate, technically sound, and deeply helpful answers with clean Markdown formatting, bullet points, and syntax-highlighted code blocks.`,
+      },
+      ...messages.map((m: any) => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.text || m.content || '',
+      })),
+    ];
+
+    const neuralRes = await fetch('https://text.pollinations.ai/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: neuralMessages,
+        model: 'openai',
+        seed: 42,
+      }),
+    });
+
+    if (neuralRes.ok) {
+      const fullText = await neuralRes.text();
+      if (fullText && fullText.trim()) {
+        const words = fullText.split(/(\s+)/);
+        let buffer = '';
+        for (let i = 0; i < words.length; i++) {
+          if (isDisconnected()) break;
+          buffer += words[i];
+          if (i % 3 === 0 || i === words.length - 1) {
+            res.write(`data: ${JSON.stringify({ chunk: buffer })}\n\n`);
+            (res as any).flush?.();
+            buffer = '';
+            await new Promise(r => setTimeout(r, 20));
+          }
+        }
+        return true;
+      }
+    }
+  } catch {
+    // Graceful fallback
+  }
+  return false;
+}
 
 const DEFAULT_SYSTEM_INSTRUCTION =
   'You are ERROREN AI, a brilliant, super-helpful, friendly, and lightning-fast AI companion. ' +
@@ -146,120 +242,50 @@ app.post('/api/chat/stream', async (req: Request, res: Response): Promise<void> 
   });
 
   try {
-    const ai = getGeminiClient();
-
-    // Iterate through candidate models if 503, 429, or capacity issues arise
-    for (const modelName of CANDIDATE_MODELS) {
-      if (clientDisconnected) break;
-
+    if (canAttemptGemini()) {
       try {
-        console.log(`[ERROREN] Attempting streaming generation with model: ${modelName}`);
-
-        const responseStream = await ai.models.generateContentStream({
-          model: modelName,
-          contents: contents as any,
-          config,
-        });
-
-        for await (const chunk of responseStream) {
+        const ai = getGeminiClient();
+        for (const modelName of CANDIDATE_MODELS) {
           if (clientDisconnected) break;
-          const candidateText = (chunk as GenerateContentResponse).text;
-          if (candidateText) {
-            res.write(`data: ${JSON.stringify({ chunk: candidateText })}\n\n`);
-            (res as any).flush?.();
-            streamSucceeded = true;
-          }
-        }
 
-        if (streamSucceeded) {
-          console.log(`[ERROREN] Successfully finished stream with model: ${modelName}`);
-          break;
-        }
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[ERROREN] Model ${modelName} stream failed:`, err?.message || err);
+          try {
+            const responseStream = await ai.models.generateContentStream({
+              model: modelName,
+              contents: contents as any,
+              config,
+            });
 
-        // If we already sent chunks to the client, we cannot cleanly switch models mid-stream
-        if (streamSucceeded || clientDisconnected) {
-          break;
-        }
-
-        // Delay briefly before fallback attempt to relieve transient concurrency
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-    }
-
-    // If streaming had issues but nothing was sent yet, attempt non-streaming fallback
-    if (!streamSucceeded && !clientDisconnected) {
-      console.log('[ERROREN] Attempting non-streaming fallback with gemini-3.1-flash-lite...');
-      try {
-        const directRes = await ai.models.generateContent({
-          model: 'gemini-3.1-flash-lite',
-          contents: contents as any,
-          config,
-        });
-        if (directRes.text) {
-          res.write(`data: ${JSON.stringify({ chunk: directRes.text })}\n\n`);
-          (res as any).flush?.();
-          streamSucceeded = true;
-        }
-      } catch (fallbackErr: any) {
-        console.warn('[ERROREN] Direct fallback also encountered error:', fallbackErr?.message || fallbackErr);
-        lastError = fallbackErr || lastError;
-      }
-    }
-
-    // If all Gemini models failed (e.g. 403 PERMISSION_DENIED or capacity limits), seamlessly activate Neural Multi-Lingual Intelligence
-    if (!streamSucceeded && !clientDisconnected) {
-      console.log('[ERROREN] Gemini models unavailable (403 or quota). Activating Multi-Lingual Neural Engine fallback...');
-      try {
-        const neuralMessages = [
-          {
-            role: 'system',
-            content: `${systemPrompt || DEFAULT_SYSTEM_INSTRUCTION}\n\nCRITICAL MULTI-LINGUAL DIRECTIVE:
-1. You are ERROREN AI, a world-class, highly knowledgeable synthetic intelligence.
-2. You understand and speak ALL languages with native fluency: English, Roman Urdu, Urdu (اردو), Hindi, Arabic, Spanish, French, German, Chinese, etc.
-3. ALWAYS reply in the EXACT language and script that the user spoke. If the user writes in Roman Urdu (e.g. "mjy batao", "kese ho", "code samjhao"), reply fluently in natural, respectful Roman Urdu. If in English, reply in English. If in Urdu script, reply in Urdu.
-4. Provide complete, accurate, technically sound, and deeply helpful answers with clean Markdown formatting, bullet points, and code blocks.`,
-          },
-          ...messages.map((m: any) => ({
-            role: m.role === 'user' ? 'user' : 'assistant',
-            content: m.text || m.content || '',
-          })),
-        ];
-
-        const neuralRes = await fetch('https://text.pollinations.ai/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: neuralMessages,
-            model: 'openai',
-            seed: 42,
-          }),
-        });
-
-        if (neuralRes.ok) {
-          const fullText = await neuralRes.text();
-          if (fullText && fullText.trim()) {
-            // Stream the text in progressive natural chunks for smooth real-time animation
-            const words = fullText.split(/(\s+)/);
-            let buffer = '';
-            for (let i = 0; i < words.length; i++) {
+            for await (const chunk of responseStream) {
               if (clientDisconnected) break;
-              buffer += words[i];
-              if (i % 3 === 0 || i === words.length - 1) {
-                res.write(`data: ${JSON.stringify({ chunk: buffer })}\n\n`);
+              const candidateText = (chunk as GenerateContentResponse).text;
+              if (candidateText) {
+                res.write(`data: ${JSON.stringify({ chunk: candidateText })}\n\n`);
                 (res as any).flush?.();
-                buffer = '';
-                await new Promise(r => setTimeout(r, 20));
+                streamSucceeded = true;
               }
             }
-            streamSucceeded = true;
+
+            if (streamSucceeded) {
+              break;
+            }
+          } catch (err: any) {
+            handleGeminiFailure(err);
+            break;
           }
         }
-      } catch (neuralErr: any) {
-        console.warn('[ERROREN] Neural fallback stream encountered error:', neuralErr?.message || neuralErr);
+      } catch (clientErr: any) {
+        handleGeminiFailure(clientErr);
       }
+    }
+
+    // Seamlessly stream via Multi-Lingual Neural Engine if Gemini is unavailable, denied, or quota-limited
+    if (!streamSucceeded && !clientDisconnected) {
+      streamSucceeded = await streamNeuralFallback(
+        messages,
+        systemPrompt,
+        res,
+        () => clientDisconnected
+      );
     }
 
     if (streamSucceeded) {
@@ -268,15 +294,13 @@ app.post('/api/chat/stream', async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // If both Gemini and Neural fallback failed
-    console.error('All model attempts failed in /api/chat/stream:', lastError);
+    // If stream did not succeed
     const userMessage =
       'Main is waqt connection issue me hoon. Baraye meherbani thori dair baad dobara koshish karein ya naya sawal poochein.';
     res.write(`data: ${JSON.stringify({ error: userMessage })}\n\n`);
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (error: any) {
-    console.error('Fatal error in /api/chat/stream:', error);
     const errorMessage = error?.message || 'An unexpected error occurred while communicating with ERROREN AI.';
     res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
     res.write('data: [DONE]\n\n');
@@ -299,29 +323,32 @@ app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
   };
 
   try {
-    const ai = getGeminiClient();
-    let lastError: any = null;
-
-    for (const modelName of CANDIDATE_MODELS) {
+    if (canAttemptGemini()) {
       try {
-        console.log(`[ERROREN non-stream] Attempting with model: ${modelName}`);
-        const response = await ai.models.generateContent({
-          model: modelName,
-          contents: contents as any,
-          config,
-        });
+        const ai = getGeminiClient();
+        for (const modelName of CANDIDATE_MODELS) {
+          try {
+            const response = await ai.models.generateContent({
+              model: modelName,
+              contents: contents as any,
+              config,
+            });
 
-        if (response.text) {
-          res.json({ text: response.text });
-          return;
+            if (response.text) {
+              res.json({ text: response.text });
+              return;
+            }
+          } catch (err: any) {
+            handleGeminiFailure(err);
+            break;
+          }
         }
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[ERROREN non-stream] Model ${modelName} failed:`, err?.message || err);
+      } catch (err) {
+        handleGeminiFailure(err);
       }
     }
 
-    // If Gemini fails, fallback to multi-lingual neural engine
+    // Multi-lingual Neural engine fallback
     try {
       const neuralMessages = [
         {
@@ -355,43 +382,14 @@ app.post('/api/chat', async (req: Request, res: Response): Promise<void> => {
           return;
         }
       }
-    } catch (neuralErr) {
-      console.warn('[ERROREN non-stream] Neural fallback failed:', neuralErr);
+    } catch {
+      // Fallback failed
     }
 
     res.status(503).json({
-      error: lastError?.message || 'AI service currently unavailable across all model endpoints.',
+      error: 'AI service currently experiencing high traffic. Please try again in a few moments.',
     });
   } catch (error: any) {
-    // Also catch any client init error and try neural
-    try {
-      const neuralMessages = [
-        {
-          role: 'system',
-          content: `${systemPrompt || DEFAULT_SYSTEM_INSTRUCTION}\n\nAlways reply in the user's language (e.g. Roman Urdu if Roman Urdu, English if English).`,
-        },
-        ...messages.map((m: any) => ({
-          role: m.role === 'user' ? 'user' : 'assistant',
-          content: m.text || m.content || '',
-        })),
-      ];
-      const fallbackRes = await fetch('https://text.pollinations.ai/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: neuralMessages, model: 'openai' }),
-      });
-      if (fallbackRes.ok) {
-        const text = await fallbackRes.text();
-        if (text && text.trim()) {
-          res.json({ text: text.trim() });
-          return;
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    console.error('Error generating response in /api/chat:', error);
     res.status(500).json({
       error: error?.message || 'Failed to generate response.',
     });
@@ -442,54 +440,55 @@ app.post('/api/generate-image', async (req: Request, res: Response): Promise<voi
   const effectivePrompt = enhanceImagePrompt(cleanPrompt);
   console.log(`[ERROREN Image API] Request received for prompt: "${cleanPrompt}", effective: "${effectivePrompt}", hasImage: ${!!image?.data}`);
 
-  // 1. First attempt with Gemini Nano/Flash image generation model if key is configured
-  try {
-    const ai = getGeminiClient();
-    const parts: any[] = [];
+  // 1. First attempt with Gemini image generation model if key is configured and available
+  if (canAttemptGemini()) {
+    try {
+      const ai = getGeminiClient();
+      const parts: any[] = [];
 
-    if (image?.data) {
-      parts.push({
-        inlineData: {
-          data: image.data,
-          mimeType: image.mimeType || 'image/png',
-        },
-      });
-      parts.push({
-        text: effectivePrompt || 'Edit and transform this image according to user instructions.',
-      });
-    } else {
-      parts.push({ text: effectivePrompt });
-    }
-
-    // Try Gemini image model
-    const geminiImgRes = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-image',
-      contents: { parts } as any,
-      config: {
-        imageConfig: {
-          aspectRatio: (aspectRatio as any) || '1:1',
-        },
-      },
-    });
-
-    for (const part of geminiImgRes.candidates?.[0]?.content?.parts || []) {
-      if ((part as any).inlineData) {
-        const mime = (part as any).inlineData.mimeType || 'image/png';
-        const b64 = (part as any).inlineData.data;
-        const dataUri = `data:${mime};base64,${b64}`;
-        console.log('[ERROREN Image API] Successfully generated with Gemini Imagen model!');
-        res.json({
-          url: dataUri,
-          imageUrl: dataUri,
-          prompt: cleanPrompt,
-          revisedPrompt: effectivePrompt !== cleanPrompt ? effectivePrompt : undefined,
-          source: 'gemini',
+      if (image?.data) {
+        parts.push({
+          inlineData: {
+            data: image.data,
+            mimeType: image.mimeType || 'image/png',
+          },
         });
-        return;
+        parts.push({
+          text: effectivePrompt || 'Edit and transform this image according to user instructions.',
+        });
+      } else {
+        parts.push({ text: effectivePrompt });
       }
+
+      // Try Gemini image model
+      const geminiImgRes = await ai.models.generateContent({
+        model: 'gemini-3.1-flash-lite-image',
+        contents: { parts } as any,
+        config: {
+          imageConfig: {
+            aspectRatio: (aspectRatio as any) || '1:1',
+          },
+        },
+      });
+
+      for (const part of geminiImgRes.candidates?.[0]?.content?.parts || []) {
+        if ((part as any).inlineData) {
+          const mime = (part as any).inlineData.mimeType || 'image/png';
+          const b64 = (part as any).inlineData.data;
+          const dataUri = `data:${mime};base64,${b64}`;
+          res.json({
+            url: dataUri,
+            imageUrl: dataUri,
+            prompt: cleanPrompt,
+            revisedPrompt: effectivePrompt !== cleanPrompt ? effectivePrompt : undefined,
+            source: 'gemini',
+          });
+          return;
+        }
+      }
+    } catch (geminiErr: any) {
+      handleGeminiFailure(geminiErr);
     }
-  } catch (geminiErr: any) {
-    console.warn('[ERROREN Image API] Gemini direct image model unavailable or error:', geminiErr?.message || geminiErr);
   }
 
   // 2. High-Fidelity Neural Fallback Pipeline

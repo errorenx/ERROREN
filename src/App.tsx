@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
 import {
   loadConversations,
   saveConversations,
@@ -27,12 +26,13 @@ import { SettingsModal } from './components/SettingsModal';
 import { AccountModal } from './components/AccountModal';
 import { ProjectModal } from './components/ProjectModal';
 import {
-  auth,
+  getSupabase,
   logOut,
   saveConversationToCloud,
   deleteConversationFromCloud,
   loadCloudConversations,
-} from './lib/firebase';
+} from './lib/supabase';
+import type { User } from '@supabase/supabase-js';
 import {
   applyTheme,
   saveThemeMode,
@@ -85,79 +85,108 @@ export default function App() {
     saveSettings(settings);
   }, [settings]);
 
-  // Listen to Firebase Auth state
+  // Listen to Supabase Auth state
   useEffect(() => {
-    if (!auth) return;
-    try {
-      const unsubscribe = onAuthStateChanged(auth, async user => {
-        setCurrentUser(user);
-        if (user) {
-          // If logged in via Google and no local profile name, populate local profile
-          const profile: UserProfile = {
-            id: user.uid,
-            name: user.displayName || localProfile?.name || 'User',
-            email: user.email || '',
-            avatar: user.photoURL || undefined,
-            savedAt: Date.now(),
-          };
-          setLocalProfile(profile);
-          saveLocalProfile(profile);
+    const supabase = getSupabase();
+    if (!supabase) return;
 
-          // 1. Strictly load this user's OWN isolated conversations from localStorage cache
-          const userLocalChats = loadConversations(user.uid);
-          setConversations(userLocalChats);
+    const handleAuthChange = async (user: User | null) => {
+      setCurrentUser(user);
+      if (user) {
+        let profileName =
+          user.user_metadata?.name ||
+          user.user_metadata?.display_name ||
+          user.email?.split('@')[0] ||
+          'User';
 
-          try {
-            // 2. Fetch cloud chats strictly for THIS user
-            const cloudChats = await loadCloudConversations(user.uid);
-            if (cloudChats.length > 0) {
-              setConversations(cloudChats);
-              const savedActiveId = loadActiveChatId(user.uid);
-              if (cloudChats.some(c => c.id === savedActiveId)) {
-                setActiveId(savedActiveId);
-              } else {
-                setActiveId(cloudChats[0].id);
-              }
-            } else if (userLocalChats.length > 0) {
-              // Upload only this user's own local chats to cloud
-              userLocalChats.forEach(c => {
-                if (c.messages.length > 0) {
-                  saveConversationToCloud(user.uid, c).catch(err =>
-                    console.warn('User cloud sync error:', err)
-                  );
-                }
-              });
-            }
-          } catch (err) {
-            console.error('Failed to sync cloud conversations:', err);
+        try {
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('name, email')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (prof?.name) {
+            profileName = prof.name;
           }
-        } else {
-          // User logged out or guest: strictly load isolated guest chats
-          const guestChats = loadConversations(null);
-          setConversations(guestChats);
-          const guestActiveId = loadActiveChatId(null) || guestChats[0]?.id || 'conv_default';
-          setActiveId(guestActiveId);
+        } catch (e) {
+          console.warn('Profile fetch notice on auth change:', e);
         }
-      }, err => {
-        console.warn('onAuthStateChanged listener warning:', err);
-      });
 
-      return () => unsubscribe();
-    } catch (err) {
-      console.warn('onAuthStateChanged setup notice:', err);
-    }
+        const profile: UserProfile = {
+          id: user.id,
+          name: profileName,
+          email: user.email || '',
+          avatar: undefined,
+          savedAt: Date.now(),
+        };
+        setLocalProfile(profile);
+        saveLocalProfile(profile);
+
+        // 1. Strictly load this user's OWN isolated conversations from localStorage cache
+        const userLocalChats = loadConversations(user.id);
+        setConversations(userLocalChats);
+
+        try {
+          // 2. Fetch cloud chats strictly for THIS user from Supabase
+          const cloudChats = await loadCloudConversations(user.id);
+          if (cloudChats.length > 0) {
+            setConversations(cloudChats);
+            const savedActiveId = loadActiveChatId(user.id);
+            if (cloudChats.some(c => c.id === savedActiveId)) {
+              setActiveId(savedActiveId);
+            } else {
+              setActiveId(cloudChats[0].id);
+            }
+          } else if (userLocalChats.length > 0) {
+            // Upload user's local chats to Supabase
+            userLocalChats.forEach(c => {
+              if (c.messages.length > 0) {
+                saveConversationToCloud(user.id, c).catch(err =>
+                  console.warn('User cloud sync notice:', err)
+                );
+              }
+            });
+          }
+        } catch (err) {
+          console.error('Failed to sync cloud conversations:', err);
+        }
+      } else {
+        // User logged out or guest: strictly load isolated guest chats
+        const guestChats = loadConversations(null);
+        setConversations(guestChats);
+        const guestActiveId = loadActiveChatId(null) || guestChats[0]?.id || 'conv_default';
+        setActiveId(guestActiveId);
+      }
+    };
+
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleAuthChange(session?.user || null);
+    });
+
+    // Subscribe to auth state changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      handleAuthChange(session?.user || null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Sync active chat ID & conversations with localStorage strictly per user
   useEffect(() => {
-    const userId = currentUser?.uid || localProfile?.id || null;
+    const userId = currentUser?.id || localProfile?.id || null;
     saveConversations(conversations, userId);
-  }, [conversations, currentUser?.uid, localProfile?.id]);
+  }, [conversations, currentUser?.id, localProfile?.id]);
 
   useEffect(() => {
-    const userId = currentUser?.uid || localProfile?.id || null;
+    const userId = currentUser?.id || localProfile?.id || null;
     saveActiveChatId(activeId, userId);
-  }, [activeId, currentUser?.uid, localProfile?.id]);
+  }, [activeId, currentUser?.id, localProfile?.id]);
 
   // Global Keyboard Shortcuts (Ctrl/Cmd + K for new chat)
   useEffect(() => {
@@ -324,7 +353,7 @@ export default function App() {
     setActiveId(newChat.id);
 
     if (currentUser) {
-      saveConversationToCloud(currentUser.uid, newChat).catch(console.error);
+      saveConversationToCloud(currentUser.id, newChat).catch(console.error);
     }
   };
 
@@ -349,7 +378,7 @@ export default function App() {
     });
 
     if (currentUser) {
-      deleteConversationFromCloud(currentUser.uid, id).catch(console.error);
+      deleteConversationFromCloud(currentUser.id, id).catch(console.error);
     }
   };
 
@@ -369,7 +398,7 @@ export default function App() {
     };
     if (currentUser) {
       conversations.forEach(c => {
-        deleteConversationFromCloud(currentUser.uid, c.id).catch(console.error);
+        deleteConversationFromCloud(currentUser.id, c.id).catch(console.error);
       });
     }
     setConversations([fresh]);
@@ -423,7 +452,8 @@ export default function App() {
     ].filter(Boolean).join('\n\n');
 
     try {
-      const response = await fetch('/api/chat/stream', {
+      const apiBase = (import.meta as any).env?.VITE_API_URL || '';
+      const response = await fetch(`${apiBase}/api/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: abortController.signal,
@@ -440,7 +470,7 @@ export default function App() {
           if (settings.clientApiKey) {
             // Direct client call for static GitHub Pages deployment with user-provided Gemini API key
             try {
-              const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${settings.clientApiKey}`;
+              const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${settings.clientApiKey}`;
               const clientPayload = {
                 contents: historyForApi.map(m => ({
                   role: m.role === 'user' ? 'user' : 'model',
@@ -609,8 +639,8 @@ export default function App() {
           };
 
           if (currentUser) {
-            saveConversationToCloud(currentUser.uid, updatedConv).catch(err =>
-              console.warn('Failed to auto-save to Firestore:', err)
+            saveConversationToCloud(currentUser.id, updatedConv).catch(err =>
+              console.warn('Failed to auto-save to cloud:', err)
             );
           }
 
@@ -630,7 +660,7 @@ export default function App() {
               ),
             };
             if (currentUser) {
-              saveConversationToCloud(currentUser.uid, updatedConv).catch(console.error);
+              saveConversationToCloud(currentUser.id, updatedConv).catch(console.error);
             }
             return updatedConv;
           });
@@ -657,7 +687,7 @@ export default function App() {
               ),
             };
             if (currentUser) {
-              saveConversationToCloud(currentUser.uid, updatedConv).catch(console.error);
+              saveConversationToCloud(currentUser.id, updatedConv).catch(console.error);
             }
             return updatedConv;
           });
@@ -767,7 +797,7 @@ export default function App() {
     );
 
     if (currentUser) {
-      saveConversationToCloud(currentUser.uid, updatedConv).catch(console.error);
+      saveConversationToCloud(currentUser.id, updatedConv).catch(console.error);
     }
 
     // In-chat ChatGPT-style image generation/editing
@@ -796,7 +826,8 @@ export default function App() {
       );
 
       try {
-        const response = await fetch('/api/generate-image', {
+        const apiBase = (import.meta as any).env?.VITE_API_URL || '';
+        const response = await fetch(`${apiBase}/api/generate-image`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -837,7 +868,7 @@ export default function App() {
                 ),
               };
               if (currentUser) {
-                saveConversationToCloud(currentUser.uid, finishedConv).catch(console.error);
+                saveConversationToCloud(currentUser.id, finishedConv).catch(console.error);
               }
               return finishedConv;
             })
@@ -875,7 +906,7 @@ export default function App() {
                 ),
               };
               if (currentUser) {
-                saveConversationToCloud(currentUser.uid, finishedConv).catch(console.error);
+                saveConversationToCloud(currentUser.id, finishedConv).catch(console.error);
               }
               return finishedConv;
             })
@@ -959,7 +990,7 @@ export default function App() {
     );
 
     if (currentUser) {
-      saveConversationToCloud(currentUser.uid, updatedConv).catch(console.error);
+      saveConversationToCloud(currentUser.id, updatedConv).catch(console.error);
     }
 
     const historyForApi = newMessages.map(m => ({
@@ -986,7 +1017,7 @@ export default function App() {
         };
 
         if (currentUser) {
-          saveConversationToCloud(currentUser.uid, updatedConv).catch(console.error);
+          saveConversationToCloud(currentUser.id, updatedConv).catch(console.error);
         }
 
         return updatedConv;
