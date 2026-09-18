@@ -353,6 +353,8 @@ export async function saveConversationToCloud(
         user_id: userId,
         role: m.role === 'user' ? 'user' : 'assistant',
         content: m.content || '',
+        attachment: m.attachment ? m.attachment : null,
+        generated_image: m.generatedImage ? m.generatedImage : null,
         created_at: new Date(m.timestamp || Date.now()).toISOString(),
       }));
 
@@ -427,7 +429,7 @@ export async function loadCloudConversations(userId: string): Promise<Conversati
     // 2. Fetch user's messages ordered chronologically
     const { data: msgs, error: msgErr } = await supabase
       .from('messages')
-      .select('id, conversation_id, role, content, created_at')
+      .select('id, conversation_id, role, content, attachment, generated_image, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: true });
 
@@ -446,6 +448,8 @@ export async function loadCloudConversations(userId: string): Promise<Conversati
         id: m.id,
         role: m.role === 'user' ? 'user' : 'assistant',
         content: m.content || '',
+        attachment: m.attachment || undefined,
+        generatedImage: m.generated_image || undefined,
         timestamp: m.created_at ? new Date(m.created_at).getTime() : Date.now(),
       });
     });

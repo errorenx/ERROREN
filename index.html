@@ -15,6 +15,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300..800;1,300..800&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
+    <script>
+      // Ensure GitHub Pages has a trailing slash for relative assets (prevents blank/loading screen)
+      (function() {
+        if (
+          window.location.hostname.endsWith('github.io') &&
+          !window.location.pathname.endsWith('/') &&
+          !window.location.pathname.split('/').pop().includes('.')
+        ) {
+          window.location.replace(
+            window.location.origin + window.location.pathname + '/' + window.location.search + window.location.hash
+          );
+        }
+      })();
+    </script>
   </head>
   <body style="margin: 0; padding: 0; background-color: #070d1a; color: #f0f6fc; font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;">
     <div id="root">

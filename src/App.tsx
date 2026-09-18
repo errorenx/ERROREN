@@ -46,6 +46,7 @@ import {
   DEFAULT_THEME_MODE,
   DEFAULT_COLOR_ID,
 } from './utils/theme';
+import { classifyImageIntent } from './utils/imageIntent';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -700,69 +701,6 @@ export default function App() {
     }
   };
 
-  const isImageRequest = (promptText: string, hasAttachment: boolean): boolean => {
-    const p = promptText.toLowerCase().trim();
-    if (
-      p.startsWith('/image') ||
-      p.startsWith('/draw') ||
-      p.startsWith('/photo') ||
-      p.startsWith('/generate') ||
-      p.startsWith('/edit')
-    ) {
-      return true;
-    }
-    if (
-      p.includes('generate image') ||
-      p.includes('generate photo') ||
-      p.includes('generate an image') ||
-      p.includes('create an image') ||
-      p.includes('create a photo') ||
-      p.includes('create photo') ||
-      p.includes('create image') ||
-      p.includes('draw an image') ||
-      p.includes('draw a picture') ||
-      p.includes('make an image') ||
-      p.includes('make a photo') ||
-      p.includes('draw me') ||
-      p.includes('paint an image')
-    ) {
-      return true;
-    }
-    // Roman Urdu & Urdu patterns:
-    if (
-      p.includes('photo bana') ||
-      p.includes('photo bna') ||
-      p.includes('image bna') ||
-      p.includes('image bana') ||
-      p.includes('tasveer bna') ||
-      p.includes('tasweer bna') ||
-      p.includes('tasveer bana') ||
-      p.includes('photo chay') ||
-      p.includes('image chay') ||
-      p.includes('photo chahiye') ||
-      p.includes('image chahiye') ||
-      p.includes('photo create') ||
-      p.includes('image create') ||
-      p.includes('photo bnwa') ||
-      p.includes('photo bnay') ||
-      p.includes('image bnay')
-    ) {
-      return true;
-    }
-    if (
-      hasAttachment &&
-      (p.includes('edit') ||
-        p.includes('modify') ||
-        p.includes('style') ||
-        p.includes('change') ||
-        p.includes('make it') ||
-        p.includes('filter'))
-    ) {
-      return true;
-    }
-    return false;
-  };
-
   const handleSendMessage = async (text: string, attachment?: MessageAttachment) => {
     if (isGenerating) return;
 
@@ -800,16 +738,24 @@ export default function App() {
       saveConversationToCloud(currentUser.id, updatedConv).catch(console.error);
     }
 
-    // In-chat ChatGPT-style image generation/editing
-    if (isImageRequest(text, !!attachment)) {
+    // Natural Language Multimodal Intent Detection (Generate, Edit, Reference, or Normal Chat)
+    const imageIntent = classifyImageIntent(text, attachment, currentConv.messages);
+
+    if (imageIntent.type !== 'none') {
       setIsGenerating(true);
       const assistantMsgId = `asst_${Date.now()}`;
+
+      let placeholderContent = `Creating photo for: "${imageIntent.prompt}"...`;
+      if (imageIntent.type === 'edit') {
+        placeholderContent = `Editing photo based on instruction: "${imageIntent.prompt}"...`;
+      } else if (imageIntent.type === 'reference') {
+        placeholderContent = `Creating photo based on reference: "${imageIntent.prompt}"...`;
+      }
+
       const placeholderAssistantMsg: ChatMessage = {
         id: assistantMsgId,
         role: 'assistant',
-        content: attachment
-          ? `Editing photo based on prompt: "${text}"...`
-          : `Creating and generating photo for: "${text}"...`,
+        content: placeholderContent,
         timestamp: Date.now(),
         isStreaming: true,
       };
@@ -827,12 +773,18 @@ export default function App() {
 
       try {
         const apiBase = (import.meta as any).env?.VITE_API_URL || '';
+        const targetImage = imageIntent.sourceImage || (attachment ? { data: attachment.data, mimeType: attachment.mimeType, url: attachment.previewUrl } : undefined);
+
         const response = await fetch(`${apiBase}/api/generate-image`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            prompt: text,
-            image: attachment ? { data: attachment.data, mimeType: attachment.mimeType } : undefined,
+            prompt: imageIntent.prompt,
+            effectivePrompt: imageIntent.effectivePrompt,
+            previousImagePrompt: imageIntent.previousImagePrompt,
+            image: targetImage,
+            mode: imageIntent.type,
+            aspectRatio: imageIntent.aspectRatio || '1:1',
           }),
         });
 
@@ -843,6 +795,13 @@ export default function App() {
         const data = await response.json();
         const generatedImgUrl = data.url || data.imageUrl;
         if (generatedImgUrl) {
+          const actionLabel =
+            imageIntent.type === 'edit'
+              ? 'edited photo'
+              : imageIntent.type === 'reference'
+              ? 'reference-inspired photo'
+              : 'generated photo';
+
           setConversations(prev =>
             prev.map(c => {
               if (c.id !== currentConv.id) return c;
@@ -854,13 +813,13 @@ export default function App() {
                     ? {
                         ...m,
                         content: data.revisedPrompt
-                          ? `Here is your generated photo:\n\n*${data.revisedPrompt}*`
-                          : `Here is your requested photo:`,
+                          ? `Here is your ${actionLabel}:\n\n*${data.revisedPrompt}*`
+                          : `Here is your ${actionLabel}:`,
                         generatedImage: {
                           url: generatedImgUrl,
-                          prompt: text,
+                          prompt: imageIntent.prompt,
                           revisedPrompt: data.revisedPrompt,
-                          aspectRatio: data.aspectRatio || '1:1',
+                          aspectRatio: data.aspectRatio || imageIntent.aspectRatio || '1:1',
                         },
                         isStreaming: false,
                       }
@@ -878,11 +837,26 @@ export default function App() {
           throw new Error(data.error || 'No image returned');
         }
       } catch (imgErr: any) {
-        console.warn('Backend image endpoint unavailable, generating via direct neural engine:', imgErr);
+        console.warn('Backend image endpoint unavailable, generating via direct neural engine fallback:', imgErr);
         try {
+          let fallbackPrompt = imageIntent.effectivePrompt || imageIntent.prompt;
+          if (imageIntent.type === 'edit' && imageIntent.previousImagePrompt && !imageIntent.effectivePrompt) {
+            fallbackPrompt = `${imageIntent.previousImagePrompt}, modified with: ${imageIntent.prompt}, photorealistic authentic quality`;
+          } else if (imageIntent.type === 'reference' && !imageIntent.effectivePrompt) {
+            fallbackPrompt = `in the visual style of reference, ${imageIntent.prompt}, 8k resolution`;
+          }
+
+          const safeAspect = imageIntent.aspectRatio || '1:1';
+          let w = 1024;
+          let h = 1024;
+          if (safeAspect === '16:9') { w = 1280; h = 720; }
+          else if (safeAspect === '9:16') { w = 720; h = 1280; }
+          else if (safeAspect === '4:3') { w = 1024; h = 768; }
+          else if (safeAspect === '3:4') { w = 768; h = 1024; }
+
           const directImgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(
-            text
-          )}?width=1024&height=1024&seed=${Math.floor(Math.random() * 1000000)}&nologo=true`;
+            fallbackPrompt
+          )}?width=${w}&height=${h}&seed=${Math.floor(Math.random() * 1000000)}&model=flux&nologo=true`;
 
           setConversations(prev =>
             prev.map(c => {
@@ -894,11 +868,11 @@ export default function App() {
                   m.id === assistantMsgId
                     ? {
                         ...m,
-                        content: `Here is your generated photo:`,
+                        content: `Here is your requested photo:`,
                         generatedImage: {
                           url: directImgUrl,
-                          prompt: text,
-                          aspectRatio: '1:1',
+                          prompt: imageIntent.prompt,
+                          aspectRatio: imageIntent.aspectRatio || '1:1',
                         },
                         isStreaming: false,
                       }

@@ -57,6 +57,12 @@ interface ChatAreaProps {
 
 const STARTER_PROMPTS = [
   {
+    icon: Sparkles,
+    category: 'Vision & Multimodal',
+    title: 'Generate Photorealistic Landscape',
+    prompt: 'Generate a realistic Pakistani mountain landscape at sunrise with golden light and snow-capped peaks.',
+  },
+  {
     icon: Code2,
     category: 'Code & Architecture',
     title: 'TypeScript & React Hook',
@@ -73,12 +79,6 @@ const STARTER_PROMPTS = [
     category: 'Analysis & Strategy',
     title: 'Modern Web Architecture',
     prompt: 'Compare micro-frontends vs modular monoliths in 2026 with clear pros, cons, and performance metrics.',
-  },
-  {
-    icon: FileText,
-    category: 'Synthesis & Summary',
-    title: 'Executive Tech Summary',
-    prompt: 'Provide a structured executive summary on how Edge Functions and WebAssembly enhance modern web apps.',
   },
 ];
 
